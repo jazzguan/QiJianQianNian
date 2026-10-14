@@ -1,11 +1,22 @@
-import { Component, Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  Component,
+  Suspense,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import type { MutableRefObject, ReactNode } from 'react'
 import * as THREE from 'three'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { ContactShadows, Html, OrbitControls, useGLTF } from '@react-three/drei'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 import { createGlazeTexture } from './textures'
-import type { GlazeStyle, PorcelainPart, PorcelainShape } from '../../types/porcelain'
+import type {
+  GlazeStyle,
+  PorcelainPart,
+  PorcelainShape,
+} from '../../types/porcelain'
 
 export interface SyncState {
   position: [number, number, number]
@@ -16,6 +27,7 @@ export interface SyncState {
 export interface PorcelainViewerProps {
   /** 未来后端返回的 GLB 地址，优先于 shape 使用；加载失败时回退到程序化轮廓 */
   modelUrl?: string
+  photoTexture?: boolean
   /** 不确定性热力图 GLB 地址（与 modelUrl 同坐标系，用于切换显示） */
   heatmapUrl?: string
   /** true 显示热力图，false 显示原始纹理 */
@@ -65,7 +77,11 @@ const DEFAULT_GLAZE: GlazeStyle = {
 const _v1 = new THREE.Vector3()
 const _v2 = new THREE.Vector3()
 
-function computeBounds(shape: PorcelainShape): { minY: number; maxY: number; maxR: number } {
+function computeBounds(shape: PorcelainShape): {
+  minY: number
+  maxY: number
+  maxR: number
+} {
   let minY = Infinity
   let maxY = -Infinity
   let maxR = 0
@@ -92,7 +108,11 @@ function radiusAt(shape: PorcelainShape, y: number): number {
   return 0
 }
 
-function segmentProfile(shape: PorcelainShape, yMin: number, yMax: number): PorcelainShape {
+function segmentProfile(
+  shape: PorcelainShape,
+  yMin: number,
+  yMax: number,
+): PorcelainShape {
   const sorted = [...shape].sort((a, b) => a[1] - b[1])
   const pts: PorcelainShape = [[radiusAt(shape, yMin) * 1.015, yMin]]
   for (const [x, y] of sorted) {
@@ -102,7 +122,10 @@ function segmentProfile(shape: PorcelainShape, yMin: number, yMax: number): Porc
   return pts
 }
 
-function findPart(parts: PorcelainPart[] | undefined, y: number): PorcelainPart | undefined {
+function findPart(
+  parts: PorcelainPart[] | undefined,
+  y: number,
+): PorcelainPart | undefined {
   if (!parts) return undefined
   for (const p of parts) {
     if (y >= p.yMin && y <= p.yMax) return p
@@ -128,7 +151,10 @@ function Vessel({
     return new THREE.LatheGeometry(points, 96)
   }, [shape])
 
-  const texture = useMemo(() => createGlazeTexture(glaze.decoration), [glaze.decoration])
+  const texture = useMemo(
+    () => createGlazeTexture(glaze.decoration),
+    [glaze.decoration],
+  )
 
   const meshRef = useRef<THREE.Mesh>(null)
 
@@ -151,45 +177,132 @@ function Vessel({
           clearcoatRoughness={0.25}
         />
       </mesh>
-      {highlightRegion && <HighlightSegment shape={shape} region={highlightRegion} />}
+      {highlightRegion && (
+        <HighlightSegment shape={shape} region={highlightRegion} />
+      )}
     </group>
   )
 }
 
-function HighlightSegment({ shape, region }: { shape: PorcelainShape; region: { yMin: number; yMax: number } }) {
-  const geometry = useMemo(() => {
-    const points = segmentProfile(shape, region.yMin, region.yMax).map(([x, y]) => new THREE.Vector2(x, y))
-    return new THREE.LatheGeometry(points, 96)
-  }, [shape, region])
-
+function HighlightSegment({
+  shape,
+  region,
+}: {
+  shape: PorcelainShape
+  region: { yMin: number; yMax: number }
+}) {
   return (
-    <mesh geometry={geometry} renderOrder={2}>
-      <meshBasicMaterial color="#c9a96b" transparent opacity={0.5} side={THREE.DoubleSide} depthWrite={false} />
-    </mesh>
+    <group>
+      {[region.yMin, region.yMax].map((y) => (
+        <mesh
+          key={y}
+          position={[0, y, 0]}
+          rotation={[Math.PI / 2, 0, 0]}
+          raycast={() => {}}
+          renderOrder={2}
+        >
+          <torusGeometry args={[radiusAt(shape, y) * 1.005, 0.045, 6, 128]} />
+          <meshBasicMaterial color="#c9a96b" toneMapped={false} />
+        </mesh>
+      ))}
+    </group>
   )
 }
 
-function GLTFModel({ url, visible = true }: { url: string; visible?: boolean }) {
+function GLTFModel({
+  url,
+  visible = true,
+  parts,
+  onPartSelect,
+  region,
+}: {
+  url: string
+  visible?: boolean
+  parts?: PorcelainPart[]
+  onPartSelect?: (id: string) => void
+  region?: { yMin: number; yMax: number }
+}) {
   const { scene: original } = useGLTF(url)
-  const scene = useMemo(() => original.clone(true), [original])
+  const scene = useMemo(() => {
+    const cloned = original.clone(true)
+    cloned.traverse((obj) => {
+      const mesh = obj as THREE.Mesh
+      if (mesh.isMesh) {
+        mesh.material = Array.isArray(mesh.material)
+          ? mesh.material.map((m) => m.clone())
+          : mesh.material.clone()
+      }
+    })
+    return cloned
+  }, [original])
   useEffect(() => {
     scene.visible = visible
     scene.traverse((obj) => {
       const mesh = obj as THREE.Mesh
       if ((mesh as { isMesh?: boolean }).isMesh) {
-        const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
+        const mats = Array.isArray(mesh.material)
+          ? mesh.material
+          : [mesh.material]
         mats.forEach((mat) => {
           const m = mat as THREE.MeshStandardMaterial
           if (m && m.isMaterial) {
-            m.vertexColors = true
+            m.vertexColors = !!mesh.geometry.getAttribute('color')
             m.side = THREE.DoubleSide
+            if ((mat as THREE.MeshBasicMaterial).isMeshBasicMaterial)
+              m.toneMapped = false
+            m.onBeforeCompile = (shader) => {
+              if (!region) return
+              shader.vertexShader = shader.vertexShader
+                .replace(
+                  '#include <common>',
+                  '#include <common>\nvarying float qjqnY;',
+                )
+                .replace(
+                  '#include <begin_vertex>',
+                  '#include <begin_vertex>\nqjqnY=(modelMatrix*vec4(transformed,1.0)).y;',
+                )
+              shader.fragmentShader = shader.fragmentShader
+                .replace(
+                  '#include <common>',
+                  '#include <common>\nvarying float qjqnY;',
+                )
+                .replace(
+                  '#include <color_fragment>',
+                  `#include <color_fragment>\nif(abs(qjqnY-${region.yMin.toFixed(4)})<0.09 || abs(qjqnY-${region.yMax.toFixed(4)})<0.09) diffuseColor.rgb=mix(diffuseColor.rgb,vec3(0.79,0.66,0.35),0.8);`,
+                )
+            }
+            m.customProgramCacheKey = () =>
+              region ? `qjqn-${region.yMin}-${region.yMax}` : 'qjqn-base'
             m.needsUpdate = true
           }
         })
       }
     })
-  }, [scene, visible])
-  return <primitive object={scene} />
+  }, [scene, visible, region?.yMin, region?.yMax])
+  useEffect(
+    () => () => {
+      scene.traverse((obj) => {
+        const mesh = obj as THREE.Mesh
+        if (mesh.isMesh)
+          (Array.isArray(mesh.material)
+            ? mesh.material
+            : [mesh.material]
+          ).forEach((m) => m.dispose())
+      })
+    },
+    [scene],
+  )
+  return (
+    <primitive
+      object={scene}
+      onClick={(e: { point: THREE.Vector3; stopPropagation: () => void }) => {
+        if (!visible) return
+        e.stopPropagation()
+        const part = findPart(parts, e.point.y)
+        if (part) onPartSelect?.(part.id)
+      }}
+    />
+  )
 }
 
 function LoadingFallback() {
@@ -200,7 +313,10 @@ function LoadingFallback() {
   )
 }
 
-class ModelErrorBoundary extends Component<{ fallback: ReactNode; children: ReactNode }, { hasError: boolean }> {
+class ModelErrorBoundary extends Component<
+  { fallback: ReactNode; children: ReactNode },
+  { hasError: boolean }
+> {
   state = { hasError: false }
   static getDerivedStateFromError() {
     return { hasError: true }
@@ -218,6 +334,8 @@ function Rig({
   syncEnabled,
   syncRef,
   viewId,
+  focusPoint,
+  focusY,
 }: {
   bounds: { minY: number; maxY: number; maxR: number }
   resetToken: number
@@ -226,8 +344,53 @@ function Rig({
   syncEnabled?: boolean
   syncRef?: MutableRefObject<SyncState | null>
   viewId?: string
+  focusPoint?: [number, number, number]
+  focusY?: number
 }) {
   const { camera } = useThree()
+  const lastFocusY = useRef(focusY)
+  useEffect(() => {
+    if (
+      !controlsRef.current ||
+      focusY === undefined ||
+      lastFocusY.current === focusY
+    )
+      return
+    lastFocusY.current = focusY
+    const target = new THREE.Vector3(0, focusY, 0)
+    const direction = camera.position
+      .clone()
+      .sub(controlsRef.current.target)
+      .normalize()
+    camera.position.copy(
+      target
+        .clone()
+        .addScaledVector(
+          direction,
+          Math.max(bounds.maxR * 2.4, (bounds.maxY - bounds.minY) * 0.85),
+        ),
+    )
+    controlsRef.current.target.copy(target)
+    controlsRef.current.update()
+  }, [focusY, camera, controlsRef, bounds])
+  useEffect(() => {
+    if (!focusPoint || !controlsRef.current) return
+    const target = new THREE.Vector3(...focusPoint)
+    const direction = camera.position
+      .clone()
+      .sub(controlsRef.current.target)
+      .normalize()
+    camera.position.copy(
+      target
+        .clone()
+        .addScaledVector(
+          direction,
+          Math.max(bounds.maxR * 2.4, (bounds.maxY - bounds.minY) * 0.85),
+        ),
+    )
+    controlsRef.current.target.copy(target)
+    controlsRef.current.update()
+  }, [focusPoint, camera, controlsRef, bounds])
 
   useEffect(() => {
     if (resetToken <= 0) return
@@ -243,8 +406,14 @@ function Rig({
     if (!syncEnabled || !syncRef?.current || !controlsRef.current) return
     const s = syncRef.current
     if (s.from === viewId) return
-    camera.position.lerp(_v1.set(s.position[0], s.position[1], s.position[2]), 0.35)
-    controlsRef.current.target.lerp(_v2.set(s.target[0], s.target[1], s.target[2]), 0.35)
+    camera.position.lerp(
+      _v1.set(s.position[0], s.position[1], s.position[2]),
+      0.35,
+    )
+    controlsRef.current.target.lerp(
+      _v2.set(s.target[0], s.target[1], s.target[2]),
+      0.35,
+    )
     controlsRef.current.update()
   })
 
@@ -262,10 +431,18 @@ function ViewerControls({
 }) {
   return (
     <div className="absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 gap-2">
-      <button type="button" onClick={onReset} className="btn-ghost !px-3 !py-1.5 !text-xs">
+      <button
+        type="button"
+        onClick={onReset}
+        className="btn-ghost !px-3 !py-1.5 !text-xs"
+      >
         重置视角
       </button>
-      <button type="button" onClick={onToggleAutoRotate} className="btn-ghost !px-3 !py-1.5 !text-xs">
+      <button
+        type="button"
+        onClick={onToggleAutoRotate}
+        className="btn-ghost !px-3 !py-1.5 !text-xs"
+      >
         {autoRotate ? '停止旋转' : '自动旋转'}
       </button>
     </div>
@@ -275,6 +452,7 @@ function ViewerControls({
 export function PorcelainViewer(props: PorcelainViewerProps) {
   const {
     modelUrl,
+    photoTexture = false,
     heatmapUrl,
     showHeatmap = false,
     shape,
@@ -293,6 +471,8 @@ export function PorcelainViewer(props: PorcelainViewerProps) {
 
   const [autoRotate, setAutoRotate] = useState(props.autoRotate ?? false)
   const [localReset, setLocalReset] = useState(0)
+  const [unobservedView, setUnobservedView] = useState(false)
+  const [focusPoint, setFocusPoint] = useState<[number, number, number]>()
   const controlsRef = useRef<OrbitControlsImpl | null>(null)
 
   const resolvedShape = shape ?? DEFAULT_SHAPE
@@ -303,10 +483,14 @@ export function PorcelainViewer(props: PorcelainViewerProps) {
   const cameraDistance = Math.max(bounds.maxR * 4.5, bounds.maxY * 1.9, 38)
 
   const selectedPart = parts?.find((p) => p.id === selectedPartId)
-  const highlightRegion = selectedPart ? { yMin: selectedPart.yMin, yMax: selectedPart.yMax } : undefined
+  const highlightRegion = selectedPart
+    ? { yMin: selectedPart.yMin, yMax: selectedPart.yMax }
+    : undefined
 
   const handleChange = () => {
     const c = controlsRef.current
+    if (c && photoTexture)
+      setUnobservedView(c.object.position.z - c.target.z < 0)
     if (!c || !syncEnabled || !syncRef || !viewId) return
     const cam = c.object as THREE.PerspectiveCamera
     syncRef.current = {
@@ -329,34 +513,76 @@ export function PorcelainViewer(props: PorcelainViewerProps) {
   return (
     <div className={'relative ' + (className ?? 'h-full w-full')}>
       <Canvas
-        dpr={[1, 2]}
+        dpr={[1, 1.5]}
         camera={{ position: [0, targetY, cameraDistance], fov: 40 }}
         gl={{ antialias: true, alpha: true }}
       >
         <ambientLight intensity={1.4} />
         <hemisphereLight args={['#ffffff', '#d8d2c2', 0.7]} />
         <directionalLight position={[6, 10, 6]} intensity={1.9} />
-        <directionalLight position={[-6, 4, -5]} intensity={0.7} color="#cfe0e8" />
-        <pointLight position={[0, targetY + 6, 6]} intensity={0.5} color="#ffffff" />
+        <directionalLight
+          position={[-6, 4, -5]}
+          intensity={0.7}
+          color="#cfe0e8"
+        />
+        <pointLight
+          position={[0, targetY + 6, 6]}
+          intensity={0.5}
+          color="#ffffff"
+        />
 
         <Suspense fallback={<LoadingFallback />}>
-          {modelUrl && (
-            <ModelErrorBoundary fallback={vessel}>
-              <GLTFModel url={modelUrl} visible={!showHeatmap} />
-            </ModelErrorBoundary>
-          )}
-          {heatmapUrl && (
-            <ModelErrorBoundary fallback={null}>
-              <GLTFModel url={heatmapUrl} visible={showHeatmap} />
-            </ModelErrorBoundary>
-          )}
-          {!modelUrl && !heatmapUrl && vessel}
+          <group
+            onDoubleClick={(e) => {
+              e.stopPropagation()
+              setFocusPoint([e.point.x, e.point.y, e.point.z])
+            }}
+          >
+            {modelUrl && (
+              <ModelErrorBoundary
+                key={modelUrl}
+                fallback={
+                  <Html center>
+                    <span className="text-xs">
+                      模型加载失败，请刷新后重试。
+                    </span>
+                  </Html>
+                }
+              >
+                <GLTFModel
+                  url={modelUrl}
+                  visible={!showHeatmap}
+                  parts={parts}
+                  onPartSelect={onPartSelect}
+                  region={highlightRegion}
+                />
+              </ModelErrorBoundary>
+            )}
+            {heatmapUrl && (
+              <ModelErrorBoundary fallback={null}>
+                <GLTFModel
+                  url={heatmapUrl}
+                  visible={showHeatmap}
+                  parts={parts}
+                  onPartSelect={onPartSelect}
+                  region={highlightRegion}
+                />
+              </ModelErrorBoundary>
+            )}
+            {!modelUrl && !heatmapUrl && vessel}
+          </group>
         </Suspense>
 
         {/* 展台 */}
         <mesh position={[0, -0.45, 0]} receiveShadow>
-          <cylinderGeometry args={[bounds.maxR * 1.35, bounds.maxR * 1.6, 0.9, 64]} />
-          <meshStandardMaterial color="#1e2a3a" roughness={0.85} metalness={0.08} />
+          <cylinderGeometry
+            args={[bounds.maxR * 1.35, bounds.maxR * 1.6, 0.9, 64]}
+          />
+          <meshStandardMaterial
+            color="#1e2a3a"
+            roughness={0.85}
+            metalness={0.08}
+          />
         </mesh>
 
         <ContactShadows
@@ -373,7 +599,7 @@ export function PorcelainViewer(props: PorcelainViewerProps) {
           ref={controlsRef}
           makeDefault
           target={[0, targetY, 0]}
-          enablePan={false}
+          enablePan={interactive}
           enableRotate={interactive}
           enableZoom={interactive}
           minDistance={bounds.maxR * 2.2}
@@ -391,8 +617,19 @@ export function PorcelainViewer(props: PorcelainViewerProps) {
           syncEnabled={syncEnabled}
           syncRef={syncRef}
           viewId={viewId}
+          focusPoint={focusPoint}
+          focusY={
+            selectedPart
+              ? (selectedPart.yMin + selectedPart.yMax) / 2
+              : undefined
+          }
         />
       </Canvas>
+      {photoTexture && unobservedView && (
+        <span className="absolute right-3 top-3 rounded bg-paper/90 px-3 py-2 text-xs text-ink-soft">
+          背面采用正面镜像纹理
+        </span>
+      )}
 
       {showControls && (
         <ViewerControls

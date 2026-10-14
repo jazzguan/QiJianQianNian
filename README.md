@@ -1,145 +1,69 @@
-# 器见千年 —— 瓷器智能学习与演化分析平台
+# 器见千年
 
-以中国传统瓷器为主题的数字化学习与展示平台。前端为 React 数字博物馆界面，
-后端提供基于 TripoSR 的**真实单图三维重建**（CPU 推理）+ 可观测性/不确定性分析。
+瓷器智能学习与演化分析平台：文物库、单图三维重建、历史时间轴、形态对比、带来源的知识问答和互动学习。
 
-> 口号：**一张照片，重现一件文物；一条时间轴，探索千年文明。**
+## 本机运行
 
-四个核心功能：三维复原 · 历史演化 · 形态对比 · AI 讲解。
+在项目目录运行 PowerShell：
 
----
+```powershell
+npm install
+npm run build
+./start.ps1
+```
 
-## 技术栈
+打开 http://127.0.0.1:8000 。当前电脑已经安装后端依赖并下载重建权重。服务同时提供前端页面与 API；开发时可另行运行 `npm run dev`，Vite 将 API、图片和模型请求转发至 8000 端口。
 
-| 端 | 技术 |
+## 新环境安装
+
+需要 Python 3.12、Node.js 20 或更高版本。
+
+```powershell
+python -m venv backend/.venv
+& backend/.venv/Scripts/python.exe -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+& backend/.venv/Scripts/python.exe -m pip install -r backend/requirements.txt
+& backend/.venv/Scripts/python.exe backend/setup_triposr.py
+Copy-Item backend/.env.example backend/.env
+```
+
+在 `backend/.env` 填写模型配置。密钥只由后端读取，文件已被 Git 忽略。
+
+| 配置 | 用途 |
 | --- | --- |
-| 前端 | React 18 · TypeScript · Vite 5 · Tailwind CSS 4 · Three.js（React Three Fiber + drei） |
-| 后端 | Python 3.11 · FastAPI · TripoSR（单图 3D 重建）· scikit-image |
+| ATRIA_BASE_URL / ATRIA_MODEL / ATRIA_API_KEY | 知识问答、对比分析与解释题评阅 |
+| GOOGLE_GEMINI_BASE_URL / GEMINI_MODEL / GEMINI_API_KEY | 图片识别与馆藏资料翻译 |
+| TRIPOSR_RESOLUTION | 网格提取分辨率，默认 128 |
+| QJQN_DB_PATH | 可选 SQLite 路径，默认 backend/data/app.sqlite3 |
 
----
+首次重建下载官方 TripoSR、DINO 编码器与 U2NetP 权重，缓存保存在 `backend/cache`。TripoSR 源码由安装脚本获取，Windows CPU 等值面提取使用 scikit-image。
 
-## 快速开始
+## 已接入功能
 
-### 环境要求
-- Node.js ≥ 18（推荐 20+）
-- Anaconda / conda
+- 文物库：20 件馆藏，唐、宋、元、明、清各 4 件；名称搜索、朝代与器型筛选、图片、尺寸、馆藏编号、来源与收藏。
+- 三维重建：Gemini 器型识别、TripoSR 生成网格、实际阶段进度、取消任务、简化浏览网格、完整 GLB 下载、模型保存与恢复。
+- 历史演化：可拖动时间轴；上传器物按器型和可见特征检索同类馆藏；缺少同类记录时显示空状态。
+- 形态对比：统一展示高度，计算口径、腹径、足径、比例和腹径位置；同步视角、部位对齐和带资料来源的 AI 差异分析。
+- AI 讲解：整体与部位问答、自由输入、当前器物上下文、TF-IDF 检索和馆藏引用。
+- 学习中心：注册登录、探索记录、学习时长、进度、收藏、判断、工艺、观察、排序和自由解释题；服务端判分与 AI 评阅。
+- 首页：根据已探索器型推荐未探索馆藏与未完成任务。
 
-### 1. 前端
+馆藏数据与照片来自[克利夫兰艺术博物馆 Open Access](https://www.clevelandart.org/open-access)，逐件记录 CC0 许可和原始链接。历史器物三维形态采用前景分割后的照片轮廓建模，正面纹饰由原照片投影并嵌入GLB；上传器物采用TripoSR网格，同样保留正面照片纹饰。背面采用正面镜像纹理，前后对称。馆藏厘米尺寸与高度统一为30的展示坐标分别保存。
 
-```bash
-cd D:\软创
-npm install        # 首次
-npm run dev        # 开发，打开 http://localhost:5173
+## 验证
+
+```powershell
+Set-Location backend
+& .venv/Scripts/python.exe -m unittest test_photo_surface test_platform test_morphology -v
+# 真实 API 与重建全流程验证（会调用已配置模型服务）
+& .venv/Scripts/python.exe live_smoke.py
 ```
 
-### 2. 后端（三维重建服务）
+`live_smoke.py` 使用独立的 `backend/cache/smoke.sqlite3` 数据库，验证问答、识别、重建、文件访问、保存和对比。
 
-首次需安装依赖（详见 `backend/README.md`）：
+数据重新导入：
 
-```bash
-cd D:\软创\backend
-
-# 建环境
-conda create -n qjqn python=3.11 -y
-
-# 装 torch（CPU 版）
-"D:/SoftWare/Anaconda/envs/qjqn/python.exe" -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
-
-# 装其余依赖
-"D:/SoftWare/Anaconda/envs/qjqn/python.exe" -m pip install -r requirements.txt
-
-# 启动（PowerShell 记得加 &）
-"D:/SoftWare/Anaconda/envs/qjqn/python.exe" -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+```powershell
+& backend/.venv/Scripts/python.exe backend/import_collection.py
 ```
 
-> 首次启动会从 HuggingFace 下载模型权重（约 1.7GB + 编码器 330MB），并预热约 30 秒。
-> 查看 `http://localhost:8000/health`，`modelLoaded: true` 表示就绪。
-> 国内访问 HuggingFace 慢可先设置镜像：`$env:HF_ENDPOINT="https://hf-mirror.com"`（PowerShell）。
-
-### 3. 前端环境变量（可选）
-
-在项目根目录建 `.env.local`：
-
-```bash
-# 重建服务地址（默认就是 localhost:8000，一般不用改）
-VITE_RECONSTRUCT_BASE=http://localhost:8000
-
-# 设为 true 则三维复原走前端 Mock，不依赖后端（离线演示用）
-VITE_USE_MOCK=true
-```
-
----
-
-## 项目结构
-
-```
-D:\软创
-├── src/                          # 前端源码
-│   ├── components/
-│   │   ├── PorcelainViewer/      # ★ 公共 3D 查看器（模型加载/旋转/部位点击/热力图）
-│   │   ├── CompareViewer/        # 双模型对比
-│   │   ├── Timeline/             # 历史时间轴
-│   │   ├── EvolutionModeSwitch/  # 个性化模式切换条
-│   │   ├── HistoricalPorcelainCard/  # 历史参考案例卡片
-│   │   ├── UploadPanel/          # 图片上传
-│   │   ├── AIExplainPanel/       # AI 讲解面板
-│   │   └── Navbar/
-│   ├── pages/                    # 5 个页面
-│   │   ├── Home/                 # 首页
-│   │   ├── Reconstruction/       # 三维复原
-│   │   ├── Timeline/             # 历史演化
-│   │   ├── Comparison/           # 形态对比
-│   │   └── AIExplain/            # AI 讲解
-│   ├── api/                      # 接口层（Mock ↔ 真实后端）
-│   │   ├── client.ts             # 统一 fetch 封装
-│   │   ├── reconstruction.ts / timeline.ts / comparison.ts / ai.ts
-│   ├── services/
-│   │   └── PorcelainReconstructionService.ts  # 重建服务
-│   ├── stores/
-│   │   └── PorcelainModelManager.tsx          # 共享状态（上传对象）
-│   ├── mock/                     # Mock 数据
-│   │   ├── data.ts               # 朝代 + 瓷器 + 对比 + AI
-│   │   └── personalizedEvolutionData.ts       # 上传后的识别/匹配
-│   ├── types/porcelain.ts        # ★ 全部共享类型
-│   ├── App.tsx                   # 路由
-│   └── main.tsx                  # 入口
-│
-├── backend/                      # Python 后端（三维重建）
-│   ├── app/
-│   │   ├── main.py               # FastAPI 路由
-│   │   ├── triposr_engine.py     # TripoSR 推理
-│   │   └── uncertainty.py        # 定向/归一化/热力图/补色
-│   ├── TripoSR/                  # 第三方模型代码（克隆，含 isosurface 补丁）
-│   ├── requirements.txt
-│   └── README.md                 # 后端详细安装说明
-│
-├── docs/
-│   ├── API.md                    # 前端架构 + 重建后端说明
-│   └── backend-contracts.md      # ★ 三功能后端契约 + 数据库 + 分工
-├── index.html
-├── package.json
-└── vite.config.ts
-```
-
----
-
-## 文档索引
-
-- **如何协作、三个功能怎么做**：`docs/backend-contracts.md`
-- **前端架构与重建后端**：`docs/API.md`
-- **后端安装运行**：`backend/README.md`
-- **形态对比运行、测量方法及接口**：`docs/morphology-comparison.md`
-- **源码阅读顺序**：见 `docs/API.md` 末尾（或直接看 `src/types/porcelain.ts` → `App.tsx` → 各 `pages/`）
-
----
-
-## 团队分工（四人）
-
-| 成员 | 负责 |
-| --- | --- |
-| 前端 + 三维重建 | ✅ 已完成 |
-| 历史演化（时空数据 + 知识库） | `docs/backend-contracts.md` §2 |
-| 形态对比（3D 形态测量） | ✅ 已实现，见 `docs/morphology-comparison.md` |
-| AI 讲解（RAG + LLM） | `docs/backend-contracts.md` §4 |
-
-各功能的**前端已就绪**，后端成员按契约实现接口、把 `src/api/*.ts` 里的 Mock 换成真实调用即可，页面无需改动。
+项目实现说明见 [docs/implementation.md](docs/implementation.md)，API 入口与存储说明见 [backend/README.md](backend/README.md)。

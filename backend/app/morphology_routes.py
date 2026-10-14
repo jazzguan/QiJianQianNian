@@ -1,23 +1,22 @@
 """历史轮廓和本服务生成 GLB 的测量与对比 API。"""
 import json
 import re
-from functools import lru_cache
 from pathlib import Path
 from urllib.parse import urlparse
 
 import trimesh
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from . import config
+from . import storage
 from .morphology import compare_measurements, measure_mesh, measure_profile
 
 router = APIRouter(prefix="/api", tags=["形态对比"])
 
 
-@lru_cache(maxsize=1)
 def catalog():
-    return json.loads(Path(__file__).with_name("morphology_catalog.json").read_text(encoding="utf-8"))
+    return {x['id']:x for x in storage.artifacts()}
 
 
 class MeasureRequest(BaseModel):
@@ -43,6 +42,16 @@ def local_model_path(model_url):
         raise HTTPException(404, "模型文件不存在")
     return target
 
+def authorize_model(model_url,request):
+    if not model_url:return
+    # 保留历史轮廓的公开查询；上传网格的测量也校验账号归属。
+    from .platform_routes import current_user
+    user = current_user(request)
+    if not user: raise HTTPException(401,'请先登录')
+    path = local_model_path(model_url)
+    task = storage.reconstruction(path.stem)
+    if not task or task['owner_id']!=user['id']: raise HTTPException(404,'模型不存在')
+
 
 def measure(artifact_id=None, model_url=None):
     try:
@@ -53,24 +62,51 @@ def measure(artifact_id=None, model_url=None):
         item = catalog().get(artifact_id)
         if item is None:
             raise HTTPException(404, "参考器物不存在")
-        return measure_profile(item["shape"])
+        result = measure_profile(item["shape"])
+        result['method'] = item.get('modelMethod','历史示例轮廓')
+        return result
     except (ValueError, TypeError, IndexError) as exc:
         raise HTTPException(422, f"形态测量失败：{exc}") from exc
 
 
 @router.post("/measure")
-def api_measure(payload: MeasureRequest):
+def api_measure(payload: MeasureRequest,request: Request):
     if bool(payload.modelUrl) == bool(payload.artifactId):
         raise HTTPException(422, "请提供 modelUrl 或 artifactId 中的一项")
+    authorize_model(payload.modelUrl,request)
     return measure(payload.artifactId, payload.modelUrl)
 
 
 @router.post("/compare")
-def api_compare(payload: CompareRequest):
+def api_compare(payload: CompareRequest,request: Request):
+    authorize_model(payload.leftModelUrl,request)
+    authorize_model(payload.rightModelUrl,request)
     left = measure(payload.leftId, payload.leftModelUrl)
     right = measure(payload.rightId, payload.rightModelUrl)
     left_label = "我的瓷器" if payload.leftModelUrl else catalog()[payload.leftId]["name"]
     right_label = "我的瓷器" if payload.rightModelUrl else catalog()[payload.rightId]["name"]
     result = compare_measurements(left, right, left_label, right_label)
+    left_item = catalog().get(payload.leftId,{})
+    right_item = catalog().get(payload.rightId,{})
+    result['featureRows'] = [{'label':label,'left':left_item.get(key,'上传对象尚无馆藏记录') if not payload.leftModelUrl else '上传对象尚无馆藏记录',
+                            'right':right_item.get(key,'')} for label,key in [('所属时期','period'),('制作工艺','summary'),('文化与年代','history')]]
+    result['sources'] = left_item.get('sources',[])+right_item.get('sources',[])
     return {"id": f"{payload.leftId}-vs-{payload.rightId}",
             "leftId": payload.leftId, "rightId": payload.rightId, **result}
+
+
+@router.post('/compare/explain')
+def explain_comparison(payload: CompareRequest,request: Request):
+    comparison=api_compare(payload,request)
+    from .knowledge import text_of
+    from .providers import text_completion,ProviderError
+    items=[storage.artifact_by_id(artifact_id) for artifact_id in [payload.leftId,payload.rightId]]
+    items=[item for item in items if item]
+    sources=[dict(item['sources'][0],id=i+1) for i,item in enumerate(items)]
+    evidence='\n\n'.join(f'[{i+1}] {text_of(item)}' for i,item in enumerate(items))
+    try:
+        answer=text_completion([{'role':'system','content':'根据形态测量与馆藏资料，比较两件器物的比例、纹饰和制作工艺。用[1]等编号引用资料。'
+            '不将馆藏记录当作上传器物的身份，不推测资料没有记载的变化原因。中文300字以内。'},
+            {'role':'user','content':f'测量：{json.dumps(comparison["rows"],ensure_ascii=False)}\n左侧：{comparison.get("leftLabel")}；右侧：{comparison.get("rightLabel")}\n资料：{evidence}'}])
+    except ProviderError as exc:raise HTTPException(502,str(exc)) from None
+    return {'answer':answer,'sources':sources}

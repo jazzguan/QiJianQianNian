@@ -1,7 +1,7 @@
 # 注意：torch / torchvision 用 CPU 版单独安装（见 README）：
 #   pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
 # 以下为其余依赖（TripoSR 推理 + FastAPI 服务）。
-transformers>=4.38.0
+transformers>=4.38.0,<5
 accelerate
 rembg
 onnxruntime
@@ -20,3 +20,6 @@ opencv-python
 fastapi
 uvicorn[standard]
 python-multipart
+fast-simplification
+scikit-image
+httpx

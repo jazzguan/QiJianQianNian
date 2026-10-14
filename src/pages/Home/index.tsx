@@ -1,8 +1,10 @@
 import { Link } from 'react-router-dom'
+import { useEffect, useState } from 'react'
 import { PorcelainViewer } from '../../components/PorcelainViewer'
-import { getPorcelainById } from '../../mock/data'
-
-const hero = getPorcelainById('song-ruyao')
+import { useCatalog, useAuth } from '../../stores/Platform'
+import { request } from '../../api/client'
+import type { Porcelain } from '../../types/porcelain'
+import ArtifactCard from '../../components/ArtifactCard'
 
 const features = [
   {
@@ -32,6 +34,19 @@ const features = [
 ]
 
 export default function Home() {
+  const { items } = useCatalog()
+  const { user } = useAuth()
+  const [recommendation, setRecommendation] = useState<{
+    items: Porcelain[]
+    tasks: { id: string; prompt: string; artifactIds: string[] }[]
+    reason: string
+  } | null>(null)
+  useEffect(() => {
+    request<typeof recommendation>('/recommendations')
+      .then(setRecommendation)
+      .catch(() => setRecommendation(null))
+  }, [user?.id])
+  const hero = items.find((x) => x.dynasty === 'song') ?? items[0]
   return (
     <div>
       {/* Hero */}
@@ -59,16 +74,49 @@ export default function Home() {
         </div>
 
         <div className="h-[420px] lg:h-[480px]">
-          <PorcelainViewer
-            shape={hero.shape}
-            glaze={hero.glaze}
-            autoRotate
-            className="h-full w-full"
-          />
+          {hero && (
+            <PorcelainViewer
+              modelUrl={hero.modelUrl}
+              photoTexture={!!hero.textureProjection}
+              shape={hero.shape}
+              glaze={hero.glaze}
+              autoRotate
+              className="h-full w-full"
+            />
+          )}
         </div>
       </section>
 
       {/* Features */}
+      <section className="mx-auto max-w-6xl px-6 pb-16">
+        <div className="flex items-center justify-between">
+          <h2 className="font-display text-2xl">
+            {recommendation?.reason ?? '馆藏探索'}
+          </h2>
+          <Link to="/library" className="text-blue">
+            浏览文物库 →
+          </Link>
+        </div>
+        <div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          {(recommendation?.items ?? items.slice(0, 4)).map((x) => (
+            <ArtifactCard key={x.id} item={x} />
+          ))}
+        </div>
+        <Link to="/learning" className="btn-ghost mt-6">
+          完成观察、判断、排序与解释任务
+        </Link>
+        <div className="mt-5 grid gap-4 sm:grid-cols-3">
+          {recommendation?.tasks.map((t) => (
+            <Link
+              key={t.id}
+              to={'/learning?artifact=' + t.artifactIds[0]}
+              className="panel p-4 text-sm leading-6 text-ink-soft"
+            >
+              {t.prompt} →
+            </Link>
+          ))}
+        </div>
+      </section>
       <section className="border-t border-ink/10 bg-paper">
         <div className="mx-auto max-w-6xl px-6 py-16">
           <div className="flex items-center gap-4">
@@ -86,7 +134,9 @@ export default function Home() {
                   {f.no}
                 </span>
                 <h3 className="font-display text-lg text-ink">{f.title}</h3>
-                <p className="text-sm leading-relaxed text-ink-soft">{f.desc}</p>
+                <p className="text-sm leading-relaxed text-ink-soft">
+                  {f.desc}
+                </p>
                 <span className="mt-auto text-xs tracking-wider text-gold opacity-0 transition-opacity group-hover:opacity-100">
                   进入 →
                 </span>

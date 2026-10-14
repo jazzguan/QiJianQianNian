@@ -4,6 +4,7 @@
 仅做真实推理，不伪造结果；模型不可用时抛出明确异常。
 """
 import sys
+import os
 import threading
 from io import BytesIO
 
@@ -17,6 +18,7 @@ sys.path.insert(0, config.TRIPOSR_DIR)
 
 _lock = threading.Lock()
 _model = None
+torch.set_num_threads(min(8,os.cpu_count() or 1))
 
 
 def _is_available() -> tuple[bool, str]:
@@ -57,12 +59,15 @@ def get_model():
         return _model
 
 
-def reconstruct(image_bytes: bytes) -> "object":
+def reconstruct(image_bytes: bytes, progress=lambda stage,value: None) -> "object":
     """输入图片字节，输出 trimesh.Trimesh（含顶点色）。"""
-    from tsr.utils import remove_background, resize_foreground  # noqa: WPS433
+    model = get_model()
+    progress('图像分割',35)
+    from tsr.utils import resize_foreground  # noqa: WPS433
+    from rembg import new_session, remove
 
     image = Image.open(BytesIO(image_bytes)).convert("RGB")
-    image = remove_background(image)
+    image = remove(image,session=new_session('u2netp'))
     image = resize_foreground(image, 0.85)
 
     # 官方处理：rembg 返回 RGBA，将前景按 alpha 合成到 0.5 灰背景，转回 RGB
@@ -70,9 +75,10 @@ def reconstruct(image_bytes: bytes) -> "object":
     arr = arr[:, :, :3] * arr[:, :, 3:4] + (1.0 - arr[:, :, 3:4]) * 0.5
     image = Image.fromarray((arr * 255.0).astype(np.uint8))
 
-    model = get_model()
+    progress('三维结构推理',55)
     with torch.no_grad():
         scene_codes = model([image], device="cpu")
+    progress('提取三维网格',70)
     mesh = model.extract_mesh(scene_codes, True, resolution=config.RESOLUTION)[0]
 
     # 转 numpy 顶点色（部分版本返回 trimesh 已带 color）

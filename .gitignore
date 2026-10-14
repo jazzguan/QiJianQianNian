@@ -1,6 +1,13 @@
 node_modules/
 dist/
 .env
+.env.*
+!.env.example
+backend/data/*.sqlite3*
+backend/data/translations.json
+backend/outputs/
+backend/cache/
+backend/TripoSR/
 *.log
 .DS_Store
 backend/.venv/

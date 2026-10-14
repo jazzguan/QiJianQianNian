@@ -1,22 +1,22 @@
-import { delay, request, USE_MOCK } from './client'
-import { mockReconstruct } from '../mock/data'
+import { PorcelainReconstructionService as service } from '../services/PorcelainReconstructionService'
 import type { ReconstructionResult } from '../types/porcelain'
-
-/** 上传图片并触发三维复原。未来对接 `POST /api/reconstruction`。 */
-export async function reconstructFromImage(image: File | string): Promise<ReconstructionResult> {
-  if (USE_MOCK) {
-    await delay(2400)
-    return mockReconstruct(image)
+export async function reconstructFromImage(
+  image: File | string,
+): Promise<ReconstructionResult> {
+  const task = await service.reconstruct(image)
+  while (true) {
+    const status = await service.getTask(task.taskId)
+    if (status.status === 'success') {
+      const model = await service.getModel(task.taskId)
+      return {
+        id: task.taskId,
+        status: 'done',
+        porcelain: model.porcelain,
+        note: model.note,
+      }
+    }
+    if (status.status !== 'processing')
+      throw new Error(status.error ?? '任务已取消')
+    await new Promise((resolve) => setTimeout(resolve, 1500))
   }
-
-  const form = new FormData()
-  if (image instanceof File) {
-    form.append('image', image)
-  } else {
-    form.append('imageUrl', image)
-  }
-  return request<ReconstructionResult>('/reconstruction', {
-    method: 'POST',
-    body: form,
-  })
 }

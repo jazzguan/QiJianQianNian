@@ -26,8 +26,8 @@ def orient_upright(mesh: trimesh.Trimesh) -> trimesh.Trimesh:
         # x 最长：绕 Z 轴旋转，使 x -> y
         v = np.stack([-v[:, 1], v[:, 0], v[:, 2]], axis=1)
     else:  # axis == 2
-        # z 最长：绕 X 轴旋转，使 z -> y
-        v = np.stack([v[:, 0], -v[:, 2], v[:, 1]], axis=1)
+        # TripoSR 的 Z 轴向上，绕 X 轴 -90°，保持顶部朝上。
+        v = np.stack([v[:, 0], v[:, 2], -v[:, 1]], axis=1)
 
     mesh = mesh.copy()
     mesh.vertices = v
@@ -185,6 +185,6 @@ def build_report(
         "elapsedMs": int(elapsed_ms),
         "note": (
             "不确定度为基于可观测性（法线朝向）的启发式估计，非真实概率置信度；"
-            "背面/底部为模型推断区域，不代表真实文物数据。已应用轴对称补色与提亮增强（适用于对称器物）。"
+            "背面/底部为模型推断区域。正面纹饰由上传照片投影，背面采用正面镜像纹理。"
         ),
     }

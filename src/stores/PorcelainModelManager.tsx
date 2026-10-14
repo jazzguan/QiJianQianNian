@@ -1,44 +1,68 @@
-import { createContext, useContext, useMemo, useState } from 'react'
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react'
 import type { ReactNode } from 'react'
 import type { CurrentPorcelain } from '../types/porcelain'
-
-/**
- * PorcelainModelManager —— 瓷器模型统一管理模块。
- *
- * 通过 React Context 共享"当前瓷器"信息（上传对象 / 演示对象），
- * 四个业务页面读取同一份状态；页面切换不会丢失，清除后各页同步恢复默认。
- * 只保存 URL、标识与元数据，不把大型模型文件存入全局状态。
- */
-
-interface PorcelainModelManagerValue {
+import { useAuth } from './Platform'
+import {
+  asCurrent,
+  PorcelainReconstructionService,
+} from '../services/PorcelainReconstructionService'
+interface Value {
   current: CurrentPorcelain | null
   setCurrent: (c: CurrentPorcelain) => void
   clearCurrent: () => void
 }
-
-const PorcelainModelContext = createContext<PorcelainModelManagerValue | null>(null)
-
-export function PorcelainModelManagerProvider({ children }: { children: ReactNode }) {
-  const [current, setCurrent] = useState<CurrentPorcelain | null>(null)
-
-  const value = useMemo<PorcelainModelManagerValue>(
-    () => ({
-      current,
-      setCurrent: (c) => setCurrent(c),
-      clearCurrent: () => setCurrent(null),
-    }),
-    [current],
+const Context = createContext<Value | null>(null)
+export function PorcelainModelManagerProvider({
+  children,
+}: {
+  children: ReactNode
+}) {
+  const { user } = useAuth(),
+    [current, setValue] = useState<CurrentPorcelain | null>(null)
+  const key = user ? 'qjqn-model:' + user.id : ''
+  useEffect(() => {
+    let alive = true
+    setValue(null)
+    if (key) {
+      const id = localStorage.getItem(key)
+      if (id)
+        PorcelainReconstructionService.getModel(id)
+          .then((m) => {
+            if (alive) setValue(asCurrent(m))
+          })
+          .catch(() => localStorage.removeItem(key))
+    }
+    return () => {
+      alive = false
+    }
+  }, [key])
+  const setCurrent = useCallback(
+    (c: CurrentPorcelain) => {
+      setValue(c)
+      if (key && c.source === 'uploaded') localStorage.setItem(key, c.id)
+    },
+    [key],
   )
-
-  return <PorcelainModelContext.Provider value={value}>{children}</PorcelainModelContext.Provider>
+  const clearCurrent = useCallback(() => {
+    setValue(null)
+    if (key) localStorage.removeItem(key)
+  }, [key])
+  const value = useMemo(
+    () => ({ current, setCurrent, clearCurrent }),
+    [current, setCurrent, clearCurrent],
+  )
+  return <Context.Provider value={value}>{children}</Context.Provider>
 }
-
-export function usePorcelainModel(): PorcelainModelManagerValue {
-  const ctx = useContext(PorcelainModelContext)
-  if (!ctx) {
-    throw new Error('usePorcelainModel 必须在 PorcelainModelManagerProvider 内使用')
-  }
-  return ctx
+export function usePorcelainModel() {
+  const c = useContext(Context)
+  if (!c) throw new Error('模型上下文尚未初始化')
+  return c
 }
-
 export default PorcelainModelManagerProvider

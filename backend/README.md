@@ -1,72 +1,47 @@
-# 器见千年 · 三维重建后端（TripoSR CPU）
+# 后端运行与 API
 
-基于 [VAST-AI-Research/TripoSR](https://github.com/VAST-AI-Research/TripoSR) 的单图三维重建服务，
-运行于 CPU（无 NVIDIA GPU 环境）。提供真实重建、可观测性分析与不确定性热力图。
+后端采用 FastAPI、SQLite、Gemini、Atria 与 TripoSR。安装和启动步骤见项目根目录 README。
 
-> 重要：本服务只做**真实推理**，不伪造结果。不确定性为**基于可观测性的启发式估计**，不是真实概率置信度。
+## 接口
 
-## 1. 环境要求
-
-- Anaconda / conda
-- Python 3.11（TripoSR 依赖兼容性最好）
-- 无 GPU 也可运行（CPU 推理）
-
-## 2. 安装
-
-```bash
-cd backend
-
-# 1) 克隆 TripoSR 仓库（已克隆可跳过）
-git clone --depth 1 https://github.com/VAST-AI-Research/TripoSR.git
-
-# 2) 建 conda 环境
-conda create -n qjqn python=3.11 -y
-
-# 3) 安装 torch CPU 版
-"D:/SoftWare/Anaconda/envs/qjqn/python.exe" -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
-
-# 4) 安装其余依赖
-"D:/SoftWare/Anaconda/envs/qjqn/python.exe" -m pip install -r requirements.txt
-
-# 5) 下载模型权重（首次运行会自动下载到 HF 缓存）
-#    若 HuggingFace 访问慢/被墙，先设置镜像再运行：
-#    export HF_ENDPOINT=https://hf-mirror.com
-```
-
-> 已对 `TripoSR/tsr/models/isosurface.py` 打补丁：用 `scikit-image` 的 marching cubes 替代
-> `torchmcubes`（后者是 C++ 扩展，Windows 无 MSVC 会编译失败）。这是唯一的第三方改动。
-
-## 3. 启动服务
-
-```bash
-cd backend
-"D:/SoftWare/Anaconda/envs/qjqn/python.exe" -m uvicorn app.main:app --host 0.0.0.0 --port 8000
-```
-
-首次启动会在后台加载模型权重（约 250MB），`/health` 返回 `modelLoaded: true` 表示就绪。
-
-## 4. API
-
-| 方法 | 路径 | 说明 |
+| 方法 | 路径 | 内容 |
 | --- | --- | --- |
-| GET | `/health` | 健康检查（模型是否已加载） |
-| POST | `/api/reconstruct` | 上传图片（multipart `file`），返回 `{taskId, status}` |
-| GET | `/api/task/{taskId}` | 查询任务状态 `processing / success / error` |
-| GET | `/api/model/{taskId}` | 成功后返回 `{modelUrl, heatmapUrl, report, shape, note}` |
-| GET | `/files/{taskId}/mesh.glb` | 原始纹理 GLB |
-| GET | `/files/{taskId}/heatmap.glb` | 不确定性热力图 GLB |
+| GET | /health | 服务、模型配置与加载状态 |
+| POST | /api/auth/register、/api/auth/login | 注册或登录 |
+| GET、POST | /api/auth/me、/api/auth/logout | 当前账号、退出 |
+| GET | /api/artifacts、/api/porcelain/{id} | 搜索馆藏、详情 |
+| GET | /api/timeline | 时间轴 |
+| POST | /api/recognize | multipart file 图片识别 |
+| POST | /api/evolution/match | 器型与特征匹配 |
+| POST | /api/reconstruct | 登录后上传并创建任务 |
+| GET、DELETE | /api/task/{id} | 实际进度、取消 |
+| GET | /api/model/{id}、/api/models | 单个模型、本人历史任务 |
+| POST、DELETE | /api/models/{id}/save | 保存或取消保存 |
+| GET | /files/{id}/{filename} | 本人的图片、完整网格、浏览网格、热力图 |
+| POST | /api/measure、/api/compare | 几何测量与对比 |
+| POST | /api/compare/explain | 根据测量与馆藏资料解释差异 |
+| POST | /api/ask、/api/ask/part | 自由问答、部位讲解 |
+| GET | /api/learning、/api/learning/tasks | 本人学习汇总、公开题目 |
+| POST | /api/learning/events、/api/learning/attempts | 记录行为、提交答案 |
+| POST、DELETE | /api/favorites/{id} | 收藏或取消 |
+| GET | /api/recommendations | 器物与任务推荐 |
 
-## 5. 输出与不确定性
+完整字段定义可在服务启动后访问 /docs 。
 
-- `mesh.glb`：TripoSR 重建网格（含顶点色纹理），归一化到展示高度、底部置 y=0。
-- `heatmap.glb`：逐顶点可观测性热力图（蓝=可观测/低不确定，红=推断/高不确定）。
-- `report`：顶点/面数、水密性、尺寸、可观测/推断比例、耗时，以及明确标注"启发式、非置信度"。
+## 数据
 
-可观测性计算：`uncertainty = 1 - dot(vertex_normal, view_dir)`，其中 `view_dir = +z`（启发式假设相机朝向）。
-这是区分"照片直接可见区域"与"背面/底部推断区域"的简化代理，非真实重建误差。
+- backend/data/artifacts.json：20 件馆藏及原始元数据、许可、来源和分割轮廓。
+- backend/data/images：压缩后的 CC0 馆藏照片。
+- backend/data/app.sqlite3：账号、会话、收藏、学习事件、答题记录、任务与模型保存状态。
+- backend/outputs：重建图片与模型；文件接口校验账号归属。
+- backend/cache：模型权重与真实接口验证数据库。
 
-## 6. 已知限制
+密码使用带随机盐的 PBKDF2-SHA256 保存；会话令牌以哈希保存，浏览器使用 HttpOnly cookie。上传图片最多12MB；任务按账号保存，服务重启后进行中的任务标为中断，可重新上传。
 
-- 无 GPU，单张约 1–3 分钟（分辨率 256）。
-- 背面/底部为模型推断结果，不代表真实文物数据。
-- 首次运行需联网下载权重与 rembg 的 u2net 模型。
+## 模型与形态
+
+TripoSR使用CPU，默认等值面分辨率128。完整网格用于几何测量，浏览版本简化至最多18,000面；两个版本均嵌入原照片的正面纹饰贴图。三维展示统一高度30；实际馆藏尺寸保留在measurementsText。
+
+photo_surface.py将正面照片投影到模型，并关于前后分界平面镜像到背面，按器物高度和水平曲面位置计算UV，保持侧面衔接。GLB采用KHR_materials_unlit，避免照片中已有的明暗被二次照明改变。update_surfaces.py可在本机为已下载的馆藏及已完成的上传模型重新生成纹理，无需再次调用云端服务。
+
+热力图以表面法线和假设相机方向计算可观测性指标。TripoSR 源码与许可证从[官方仓库](https://github.com/VAST-AI-Research/TripoSR)下载；setup_triposr.py 在源码目录增加 scikit-image marching cubes 的 CPU 适配模块。

@@ -1,36 +1,46 @@
-import { delay, request, USE_MOCK } from './client'
-import { aiQuerySuggestions, getAIQueryAnswer, getPartAnswer } from '../mock/data'
-import type { AIAnswer, AIQueryAnswer, AIQuerySuggestion } from '../types/porcelain'
-
-/** 获取器物某部位的 AI 讲解。未来对接 `POST /api/ask`。 */
-export async function fetchPartExplanation(porcelainId: string, partId: string): Promise<AIAnswer> {
-  if (USE_MOCK) {
-    await delay(400)
-    return getPartAnswer(porcelainId, partId)
+import { request } from './client'
+import type {
+  AIAnswer,
+  AIQueryAnswer,
+  AIQuerySuggestion,
+  Porcelain,
+} from '../types/porcelain'
+function context(p: Porcelain) {
+  return {
+    porcelainId: p.id,
+    category: p.category,
+    context:
+      p.dynasty === 'unknown'
+        ? JSON.stringify({
+            visibleFeatures: p.formFeatures,
+            decoration: p.decorationFeatures,
+            category: p.category,
+          })
+        : '',
   }
-  return request<AIAnswer>('/ask', {
+}
+export function fetchPartExplanation(
+  p: Porcelain,
+  partId: string,
+  signal?: AbortSignal,
+): Promise<AIAnswer> {
+  return request('/ask/part', {
     method: 'POST',
-    body: JSON.stringify({ porcelainId, partId }),
+    body: JSON.stringify({ ...context(p), partId }),
+    signal,
   })
 }
-
-/** 获取推荐问题列表。 */
-export async function fetchSuggestions(): Promise<AIQuerySuggestion[]> {
-  if (USE_MOCK) {
-    await delay(80)
-    return aiQuerySuggestions
-  }
-  return request<AIQuerySuggestion[]>('/ask/suggestions')
+export function fetchSuggestions(): Promise<AIQuerySuggestion[]> {
+  return request('/ask/suggestions')
 }
-
-/** 自由提问。未来对接 `POST /api/ask`。 */
-export async function askQuestion(question: string): Promise<AIQueryAnswer> {
-  if (USE_MOCK) {
-    await delay(700)
-    return getAIQueryAnswer(question)
-  }
-  return request<AIQueryAnswer>('/ask', {
+export function askQuestion(
+  question: string,
+  p?: Porcelain,
+  signal?: AbortSignal,
+): Promise<AIQueryAnswer> {
+  return request('/ask', {
     method: 'POST',
-    body: JSON.stringify({ question }),
+    body: JSON.stringify({ question, ...(p ? context(p) : {}) }),
+    signal,
   })
 }

@@ -1,8 +1,9 @@
 export type DynastyId = 'tang' | 'song' | 'yuan' | 'ming' | 'qing'
 
-export type DecorationStyle = 'celadon' | 'bluewhite' | 'fencai' | 'sancai' | 'plain'
+export type DecorationStyle =
+  'celadon' | 'bluewhite' | 'fencai' | 'sancai' | 'plain'
 
-/** 器物侧面轮廓：数组元素为 [半径, 高度]（单位 cm），沿中轴旋转成体 */
+/** 器物侧面轮廓 [半径, 高度]，展示坐标统一高度为30。 */
 export type ShapeProfile = Array<[number, number]>
 
 /** 别名：轮廓类型在查看器组件中的惯用名 */
@@ -38,7 +39,7 @@ export interface PorcelainPart {
 export interface Porcelain {
   id: string
   name: string
-  dynasty: DynastyId
+  dynasty: DynastyId | 'unknown'
   dynastyName: string
   period: string
   summary: string
@@ -54,6 +55,19 @@ export interface Porcelain {
   craftFeatures: string[]
   history: string
   parts: PorcelainPart[]
+  category?: string
+  sources?: Source[]
+  measurementsText?: string
+  modelMethod?: string
+  institution?: string
+  accessionNumber?: string
+  originalName?: string
+  textureProjection?: {
+    version: number
+    coverage: 'front-half' | 'symmetric-full'
+    method: string
+    sourceBounds: number[]
+  }
 }
 
 export interface DynastyInfo {
@@ -84,6 +98,8 @@ export interface ComparisonPair {
   rightId: string
   rows: ComparisonRow[]
   insight: string
+  featureRows?: ComparisonRow[]
+  sources?: Source[]
   leftLabel?: string
   rightLabel?: string
   leftMeasurement?: MorphologyMeasurement
@@ -113,11 +129,13 @@ export interface AIAnswer {
   formDescription: string
   history: string
   knowledge: string
+  sources?: Source[]
 }
 
 export interface AIQueryAnswer {
   question: string
   answer: string
+  sources?: Source[]
 }
 
 export interface AIQuerySuggestion {
@@ -131,6 +149,7 @@ export interface RecognitionResult {
   type: string
   features: string[]
   note: string
+  decorationFeatures?: string[]
 }
 
 /** 个性化演化中，某朝代的历史参考案例匹配结果 */
@@ -141,11 +160,15 @@ export interface PersonalizedMatch {
   emptyReason?: string
 }
 
-export type TaskStatus = 'idle' | 'processing' | 'success' | 'error'
+export type TaskStatus =
+  'idle' | 'processing' | 'success' | 'error' | 'cancelled'
 
 export interface ReconstructTask {
   taskId: string
   status: TaskStatus
+  stage?: string
+  progress?: number
+  error?: string
 }
 
 /** 三维重建得到的模型信息。modelUrl 为真实 GLB 地址，Mock 时为 null（用程序化轮廓）。 */
@@ -153,6 +176,9 @@ export interface ModelInfo {
   /** 程序化兜底瓷器（Mock 或真实后端缺失时用于展示/识别） */
   porcelain: Porcelain
   modelUrl: string | null
+  previewUrl?: string
+  recognition?: RecognitionResult
+  taskId?: string
   /** 不确定性热力图 GLB 地址（真实重建时返回） */
   heatmapUrl?: string | null
   /** 粗略侧面轮廓 [半径, 高度]，用于取景 / 程序化兜底 */
@@ -160,6 +186,14 @@ export interface ModelInfo {
   /** 重建质量报告 */
   report?: ReconstructionReport | null
   note: string
+}
+
+export interface Source {
+  id?: number
+  title: string
+  url: string
+  institution?: string
+  license?: string
 }
 
 /** 重建质量报告（含可观测性/不确定性启发式统计与已知局限）。 */
@@ -182,6 +216,7 @@ export interface CurrentPorcelain {
   name: string
   imageUrl: string | null
   modelUrl: string | null
+  previewUrl?: string
   heatmapUrl?: string | null
   source: ModelSource
   status: TaskStatus

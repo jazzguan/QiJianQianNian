@@ -1,178 +1,209 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Timeline } from '../../components/Timeline'
 import { PorcelainViewer } from '../../components/PorcelainViewer'
-import { EvolutionModeSwitch } from '../../components/EvolutionModeSwitch'
-import { HistoricalPorcelainCard } from '../../components/HistoricalPorcelainCard'
-import { fetchDynastyPorcelain, fetchTimeline } from '../../api/timeline'
-import { getPorcelainById } from '../../mock/data'
-import { getPersonalizedMatches } from '../../mock/personalizedEvolutionData'
+import { CompareViewer } from '../../components/CompareViewer'
+import { fetchTimeline } from '../../api/timeline'
+import { request } from '../../api/client'
+import { useCatalog, useAuth, track } from '../../stores/Platform'
 import { usePorcelainModel } from '../../stores/PorcelainModelManager'
-import type { DynastyId, DynastyInfo, Porcelain } from '../../types/porcelain'
-
-function FeatureList({ title, items }: { title: string; items: string[] }) {
-  return (
-    <section>
-      <h4 className="mb-2 font-medium text-gold">{title}</h4>
-      <ul className="flex flex-col gap-1.5">
-        {items.map((it) => (
-          <li key={it} className="flex gap-2 text-sm leading-relaxed text-ink-soft">
-            <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-gold/60" />
-            {it}
-          </li>
-        ))}
-      </ul>
-    </section>
-  )
-}
-
+import Sources from '../../components/Sources'
+import type {
+  DynastyId,
+  DynastyInfo,
+  PersonalizedMatch,
+} from '../../types/porcelain'
 export default function TimelinePage() {
-  const { current, clearCurrent } = usePorcelainModel()
-  const personalized = !!current
-
-  const [dynasties, setDynasties] = useState<DynastyInfo[]>([])
-  const [activeId, setActiveId] = useState<DynastyId>('tang')
-  const [porcelain, setPorcelain] = useState<Porcelain | null>(null)
-  const [loading, setLoading] = useState(false)
-
+  const { items, error: catalogError } = useCatalog(),
+    { current, clearCurrent } = usePorcelainModel(),
+    { user } = useAuth()
+  const [dynasties, setDynasties] = useState<DynastyInfo[]>([]),
+    [activeId, setActiveId] = useState<DynastyId>('tang'),
+    [selected, setSelected] = useState(''),
+    [category, setCategory] = useState(''),
+    [matches, setMatches] = useState<PersonalizedMatch[]>([]),
+    [error, setError] = useState('')
+  const uploaded = current?.source === 'uploaded' && current.porcelain
   useEffect(() => {
-    fetchTimeline().then(setDynasties)
+    fetchTimeline()
+      .then(setDynasties)
+      .catch((e) => setError(e.message))
   }, [])
-
   useEffect(() => {
-    if (personalized) return
-    let alive = true
-    setLoading(true)
-    fetchDynastyPorcelain(activeId).then((p) => {
-      if (!alive) return
-      setPorcelain(p)
-      setLoading(false)
+    if (!uploaded || !current.recognition) return
+    const controller = new AbortController()
+    setMatches([])
+    request<{ matches: PersonalizedMatch[] }>('/evolution/match', {
+      method: 'POST',
+      body: JSON.stringify(current.recognition),
+      signal: controller.signal,
     })
-    return () => {
-      alive = false
-    }
-  }, [activeId, personalized])
-
-  const activeDynasty = dynasties.find((d) => d.id === activeId)
-
-  const matches = useMemo(
-    () => (current?.recognition ? getPersonalizedMatches(current.recognition.category) : []),
-    [current],
+      .then((r) => setMatches(r.matches))
+      .catch((e) => {
+        if (!controller.signal.aborted) setError(e.message)
+      })
+    return () => controller.abort()
+  }, [current?.id])
+  const choices = items.filter(
+    (x) => x.dynasty === activeId && (!category || x.category === category),
   )
-  const activeMatch = matches.find((m) => m.dynasty === activeId)
-  const activeReference = activeMatch?.porcelainId ? getPorcelainById(activeMatch.porcelainId) : null
-
+  const match = matches.find((x) => x.dynasty === activeId)
+  const item = uploaded
+    ? items.find((x) => x.id === match?.porcelainId)
+    : (choices.find((x) => x.id === selected) ?? choices[0])
+  const index = dynasties.findIndex((d) => d.id === activeId)
+  const previous = items.find(
+    (x) =>
+      x.dynasty === dynasties[index - 1]?.id && x.category === item?.category,
+  )
+  useEffect(() => {
+    if (item && user) track(item.id).catch(() => {})
+  }, [item?.id, user?.id])
   return (
     <div className="mx-auto max-w-6xl px-6 py-12">
-      <h1 className="font-display text-3xl font-semibold text-ink">瓷器历史演化</h1>
+      <h1 className="font-display text-3xl">瓷器历史演化</h1>
       <p className="mt-2 text-sm text-ink-soft">
-        从不同历史时期的瓷器中，观察器型、纹饰与工艺的变化。
+        拖动时间轴，观察不同朝代馆藏器物的形态、纹饰与工艺。
       </p>
-
-      {personalized && (
-        <div className="mt-6">
-          <EvolutionModeSwitch label="我的瓷器 · 个性化演化" onBack={clearCurrent} />
+      {uploaded && (
+        <div className="panel mt-6 flex flex-wrap items-center justify-between gap-3 p-5">
+          <p>
+            我的瓷器 · {current.recognition?.category} ·{' '}
+            {current.recognition?.features.join('、')}
+          </p>
+          <button className="btn-ghost" onClick={clearCurrent}>
+            浏览全部馆藏
+          </button>
         </div>
       )}
-
       <div className="mt-8">
-        <Timeline dynasties={dynasties} activeId={activeId} onChange={setActiveId} />
+        <Timeline
+          dynasties={dynasties}
+          activeId={activeId}
+          onChange={setActiveId}
+        />
+        {dynasties.length > 1 && (
+          <input
+            aria-label="拖动历史时间轴"
+            type="range"
+            min={0}
+            max={dynasties.length - 1}
+            step={1}
+            value={index < 0 ? 0 : index}
+            onChange={(e) => {
+              setActiveId(dynasties[Number(e.target.value)].id)
+              setSelected('')
+            }}
+            className="mt-6 w-full accent-gold"
+          />
+        )}
       </div>
-
-      {personalized ? (
-        <div className="mt-8 flex flex-col gap-6">
-          {/* 上传对象 + 模拟识别 */}
-          <div className="panel flex flex-col gap-4 p-5 sm:flex-row sm:items-start">
-            {current?.imageUrl && (
-              <img
-                src={current.imageUrl}
-                alt="上传瓷器"
-                className="h-28 w-28 shrink-0 rounded-sm border border-ink/10 object-cover"
-              />
-            )}
-            <div>
-              <span className="eyebrow">我的瓷器（上传对象）</span>
-              <h3 className="mt-1 font-display text-lg text-ink">{current?.name}</h3>
-              {current?.recognition && (
-                <div className="mt-2 flex flex-col gap-2">
-                  <p className="text-sm text-ink-soft">
-                    器型类别：<span className="text-gold">{current.recognition.category}</span>
-                  </p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {current.recognition.features.map((f) => (
-                      <span key={f} className="border border-ink/15 px-2 py-0.5 text-xs text-ink-soft">
-                        {f}
-                      </span>
-                    ))}
-                  </div>
-                  <p className="text-xs text-ink-soft/70">{current.recognition.note}</p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* 历史参考案例 / 空状态 */}
-          {activeReference ? (
-            <HistoricalPorcelainCard porcelain={activeReference} difference={activeMatch?.difference} />
-          ) : (
-            <div className="panel flex h-40 items-center justify-center p-6 text-center text-sm text-ink-soft">
-              {activeMatch?.emptyReason ?? '暂未找到可靠的同类参考案例'}
-            </div>
-          )}
+      {!uploaded && (
+        <div className="my-6 flex flex-wrap gap-3">
+          <select
+            aria-label="历史器型筛选"
+            value={category}
+            onChange={(e) => {
+              setCategory(e.target.value)
+              setSelected('')
+            }}
+            className="border border-ink/20 bg-paper p-2"
+          >
+            <option value="">全部器型</option>
+            {[...new Set(items.map((x) => x.category))].map((c) => (
+              <option key={c}>{c}</option>
+            ))}
+          </select>
+          <select
+            aria-label="选择历史器物"
+            value={item?.id ?? ''}
+            onChange={(e) => setSelected(e.target.value)}
+            className="border border-ink/20 bg-paper p-2"
+          >
+            {choices.map((x) => (
+              <option key={x.id} value={x.id}>
+                {x.name}
+              </option>
+            ))}
+          </select>
         </div>
-      ) : (
+      )}
+      {(error || catalogError) && (
+        <p role="alert" className="my-5">
+          {error || catalogError}
+        </p>
+      )}
+      {item ? (
         <>
-          {activeDynasty && (
-            <div className="mt-10">
-              <div className="flex flex-col gap-1 border-l-2 border-gold/40 pl-4">
-                <span className="eyebrow">
-                  当前 · {activeDynasty.name}朝（{activeDynasty.years}）
-                </span>
-                <p className="max-w-3xl text-sm leading-relaxed text-ink-soft">{activeDynasty.intro}</p>
-              </div>
-            </div>
-          )}
-
-          <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-[420px_1fr]">
-            <div className="panel h-[440px] overflow-hidden bg-ivory/40">
-              {loading || !porcelain ? (
-                <div className="flex h-full items-center justify-center text-sm text-ink-soft">加载中…</div>
-              ) : (
+          <div className="mt-8 grid gap-6 lg:grid-cols-2">
+            {uploaded ? (
+              <CompareViewer
+                left={{
+                  ...current.porcelain!,
+                  modelUrl: current.modelUrl ?? undefined,
+                }}
+                right={item}
+              />
+            ) : (
+              <div className="panel h-[440px]">
                 <PorcelainViewer
-                  shape={porcelain.shape}
-                  glaze={porcelain.glaze}
-                  autoRotate
-                  className="h-full w-full"
+                  shape={item.shape}
+                  glaze={item.glaze}
+                  modelUrl={item.modelUrl}
+                  photoTexture={!!item.textureProjection}
+                  showControls
                 />
-              )}
-            </div>
-
-            <div className="panel flex flex-col gap-6 p-6">
-              {porcelain && (
-                <>
-                  <div>
-                    <span className="eyebrow">{porcelain.dynastyName}</span>
-                    <h2 className="mt-1 font-display text-2xl text-ink">{porcelain.name}</h2>
-                    <p className="mt-1 text-xs text-ink-soft">{porcelain.period}</p>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                    <FeatureList title="器型特点" items={porcelain.formFeatures} />
-                    <FeatureList title="纹饰特点" items={porcelain.decorationFeatures} />
-                    <FeatureList title="工艺特点" items={porcelain.craftFeatures} />
-                    <FeatureList title="历史介绍" items={[porcelain.history]} />
-                  </div>
-
-                  <div className="border-t border-dashed border-ink/15 pt-4">
-                    <span className="eyebrow">演化观察</span>
-                    <p className="mt-2 text-sm leading-relaxed text-ink-soft">
-                      {activeDynasty?.evolutionNote}
-                    </p>
-                  </div>
-                </>
-              )}
+              </div>
+            )}
+            <div className="panel space-y-5 p-6">
+              <span className="eyebrow">
+                {item.dynastyName} · {item.period}
+              </span>
+              <h2 className="font-display text-2xl">{item.name}</h2>
+              <img
+                src={item.imageUrl}
+                alt={item.name}
+                className="h-40 w-full object-contain"
+              />
+              {[
+                ['器型', item.formFeatures],
+                ['纹饰', item.decorationFeatures],
+                ['工艺', item.craftFeatures],
+              ].map(([label, features]) => (
+                <p className="text-sm leading-7" key={String(label)}>
+                  <strong>{String(label)}：</strong>
+                  {(features as string[]).join('；') || '馆藏资料未记载'}
+                </p>
+              ))}
+              <p className="text-sm leading-7">{item.description}</p>
+              <Sources sources={item.sources} />
+              <Link className="text-blue" to={'/library/' + item.id}>
+                查看馆藏详情 →
+              </Link>
             </div>
           </div>
+          {previous && (
+            <div className="panel mt-6 space-y-3 p-6">
+              <h3 className="font-display text-xl">相邻时期 · 同器型观察</h3>
+              <p className="text-sm">
+                {previous.dynastyName}代「{previous.name}」：{previous.summary}
+              </p>
+              <p className="text-sm">
+                {item.dynastyName}代「{item.name}」：{item.summary}
+              </p>
+              <Link
+                className="btn-ghost"
+                to={'/comparison?left=' + previous.id + '&right=' + item.id}
+              >
+                比较形态与馆藏工艺
+              </Link>
+            </div>
+          )}
         </>
+      ) : (
+        <p className="panel mt-8 p-12 text-center">
+          {match?.emptyReason ?? '该时期暂无符合条件的器物。'}
+        </p>
       )}
     </div>
   )
