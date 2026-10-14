@@ -1,37 +1,33 @@
-# 形态对比
+# zjz 分支形态对比
 
-形态对比页面通过后端自动计算六组参数：高度、最大腹径、口径、足径、高腹径比和最大腹径的相对高度。左侧可选择历史器物或使用当前上传的重建模型，右侧可选择五件历史参考器物。两个查看器支持同步旋转和缩放。
+更新：2026-10-14。整体功能状态见[分支状态](branch-status.md)。
+
+## 已完成
+
+左右可选择 20 件真实馆藏，左侧也可使用当前账号上传并重建的模型。后端计算六项形态参数；两个查看器支持同步旋转缩放和部位对齐。页面显示馆藏工艺、年代与来源，并可调用 Atria 生成带引用的差异分析。
 
 ## 运行
 
-形态对比可独立运行，不需要下载 TripoSR 或安装 PyTorch。在项目根目录使用 PowerShell：
+按照[项目 README](../README.md)安装依赖、配置云端模型后，在项目根目录运行：
 
 ```powershell
-python -m venv backend/.venv
-backend/.venv/Scripts/python.exe -m pip install -r backend/requirements-morphology.txt
-backend/.venv/Scripts/python.exe -m uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8000
+npm run build
+./start.ps1
 ```
 
-另开终端启动前端：
+打开 `http://127.0.0.1:8000/comparison`。开发时运行 `npm run dev`，Vite 转发请求到 8000 端口。本分支通过平台后端运行，入口为 `app.main:app`。
 
-```powershell
-npm ci
-npm run dev
-```
+## 测量方法与数据
 
-打开 `http://localhost:5173/comparison`。前端默认访问 `http://localhost:8000`，可通过 `.env.local` 中的 `VITE_COMPARISON_BASE` 单独配置对比服务地址，未设置时使用 `VITE_RECONSTRUCT_BASE`。本模块始终调用真实测量接口。
+- Y 轴为竖直轴，所有参数按器物高度统一缩放至 30。
+- 重建 GLB：应用场景节点变换后合并网格，在 0.5%–99.5% 高度取 101 个水平截面；外径为截面凸包上两点的最大距离。
+- 最大腹径取截面外径最大值；腹部位置为相应截面距底部的高度占比，多个接近最大值的截面取平均位置。
+- 口径、足径分别取顶部、底部邻近 3% 高度范围的截面外径中位数。
+- 馆藏器物从照片提取的 `[半径, 高度]` 轮廓测量：最大半径的两倍为腹径，首尾端半径的两倍为足径和口径。
+- 高腹径比为原始高度除以最大腹径；腹部位置小于 40% 为偏下，大于 60% 为偏上，其余居中。
+- 规则差异说明根据高腹径比、口径、足径和腹部位置的差值生成；AI 分析另从馆藏资料取得证据。
 
-## 测量方法
-
-- 竖直轴为 Y 轴，所有参数按器物高度统一缩放至 30，单位为归一化单位。
-- GLB：合并场景节点并应用节点变换，在高度的 0.5%–99.5% 之间取 101 个水平截面。每个截面的外径为其凸包上两点的最大距离。
-- 最大腹径：采样截面外径的最大值。腹部位置为该截面距底部的高度占比；多个相近最大截面取平均位置。
-- 口径、足径：分别取顶部、底部邻近 3% 高度范围内截面外径的中位数，因此为外轮廓估计，不测量内孔或胎壁厚度。
-- 历史器物：从现有 `[半径, 高度]` 轮廓自动计算，最大半径的两倍为腹径，首尾端半径的两倍为足径、口径。
-- 腹部位置小于 40% 为偏下，大于 60% 为偏上，其余为居中。
-- 差异洞察由归一化口径、足径、高腹径比及腹部位置的差值生成。
-
-历史参考轮廓位于 `backend/app/morphology_catalog.json`，来自 `src/mock/data.ts` 中的五件现有样例。新增或修改参考器物时，应同步两端目录数据。
+目录由 [storage.artifacts()](../backend/app/storage.py)读取，种子为 [backend/data/artifacts.json](../backend/data/artifacts.json)。目录包含唐、宋、元、明、清各 4 件馆藏。当前 20 件馆藏 GLB 都由照片轮廓建模，纹饰取自正面照片，背面采用镜像。
 
 ## 接口
 
@@ -40,36 +36,47 @@ npm run dev
 请求二选一：
 
 ```json
-{"artifactId": "song-ruyao"}
+{"artifactId": "cma-94820"}
 ```
 
 ```json
-{"modelUrl": "http://localhost:8000/files/11ae72b9-178f-473f-bba8-609258ecd712/mesh.glb"}
+{"modelUrl": "/files/11ae72b9-178f-473f-bba8-609258ecd712/mesh.glb"}
 ```
 
-返回字段：`height`、`maxBellyDiameter`、`mouthDiameter`、`footDiameter`、`heightBellyRatio`、`bellyPosition`、`bellyPositionLabel`、`shape`、`source`、`method`、`unit`。`source` 为 `mesh` 或 `profile`，`method` 为 `自动提取`。
+模型标识需替换为本人已成功完成的任务。返回 `height`、`maxBellyDiameter`、`mouthDiameter`、`footDiameter`、`heightBellyRatio`、`bellyPosition`、`bellyPositionLabel`、`shape`、`source`、`method`、`unit`。
 
-`modelUrl` 解析为本服务 `backend/outputs/{taskId}.glb` 文件，不下载远程 URL。模型必须处于 Y 轴竖直坐标系；三维重建流程已按此坐标系导出。
+`source` 为 `mesh` 或 `profile`；馆藏的 `method` 使用记录中的建模方法，重建网格为“自动提取”。`modelUrl` 解析为后端本地输出文件，测量前校验账号与任务归属。
 
 ### POST /api/compare
 
 ```json
-{"leftId": "song-ruyao", "rightId": "ming-qinghua"}
+{"leftId": "cma-94820", "rightId": "cma-111799"}
 ```
 
-上传模式额外传 `leftModelUrl`，此时测量实际 GLB，`leftId` 仅作为对比标识。接口也支持 `rightModelUrl`。
+上传重建模式附带 `leftModelUrl`，此时测量实际 GLB；接口也接受 `rightModelUrl`。返回器物标识、`rows`、`insight`、双方标签与测量结果，以及馆藏的 `featureRows`、`sources`。
 
-返回：`id`、`leftId`、`rightId`、`rows`、`insight`、`leftLabel`、`rightLabel`、`leftMeasurement`、`rightMeasurement`。
+### POST /api/compare/explain
 
-未知器物或不存在的模型返回 404；无效请求或无法测量的几何返回 422。
+请求字段与 `/api/compare` 相同。根据测量和馆藏证据调用文本模型，返回 `answer`、`sources`。
 
-## 验证
+未知器物或不存在的模型返回 404；无效输入或无法测量的几何返回 422；需要本人模型但未登录时返回 401；云端生成失败返回 502。
+
+## 未完成
+
+- 任意 GLB 导入、竖直轴选择、截面轮廓叠加、CSV 导出在独立形态分支中，尚未合并至本分支。
+- 测量尚未按厘米尺度校准，未测内口径与胎壁厚度。
+- 部位选择使用标注的高度区间，未实现自动部位语义分割。
+- 官方扫描网格尚未导入，馆藏参考为照片轮廓模型。
+
+独立功能与数据状态见[形态对比分支](https://github.com/jazzguan/QiJianQianNian/blob/codex/morphology-comparison/docs/branch-status.md)。
+
+## 验证记录
+
+形态算法和接口的 9 项测试通过，覆盖解析几何、缩放和平移、朝向、场景节点变换、重建模型对比、同器物对比和异常输入；全平台共 20 项后端测试及前端构建通过。
 
 ```powershell
 Push-Location backend
-.venv/Scripts/python.exe -m unittest test_morphology -v
+& .venv/Scripts/python.exe -m unittest test_morphology -v
 Pop-Location
 npm run build
 ```
-
-测试覆盖圆柱尺寸、缩放和平移不变性、轮廓腹部位置、无效几何、历史对比、GLB 场景变换及上传对比、接口异常输入。

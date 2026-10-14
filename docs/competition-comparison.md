@@ -2,6 +2,8 @@
 
 检索日期：2026 年 10 月 13 日。赛事：全国大学生软件创新大赛·软件设计创新赛。
 
+本文中的项目状态记录于 2026-10-13 后续功能开发前，源码链接指向当时提交；2026-10-14 的已完成与未完成项见[zjz 分支状态](branch-status.md)。
+
 **对比判断：器见千年已经有三维重建接入和形态测量实现，项目的差异集中在瓷器跨时期观察与定量比较；当前完整度受到固定识别结果、模拟历史匹配和未实现的知识问答影响。**
 
 ## 公开获奖仓库
@@ -23,32 +25,32 @@
 
 BrainDance 的三维结果进入空间检索和时间回看流程。公开的[搜索入口](https://github.com/tianxingleo/BrainDance/blob/main/supabase/functions/search-models/index.ts)接受自然语言查询并调用共享检索逻辑；其[评测报告](https://github.com/tianxingleo/BrainDance/blob/main/docs/04-%E6%9C%AC%E5%9C%B0%E9%97%AE%E7%AD%94%E4%B8%8E%E5%BE%AE%E8%B0%83/Qwen3-1.7B-LoRA-%E4%B8%A5%E6%A0%BC%E6%97%A0%E6%B3%84%E6%BC%8F%E5%AF%B9%E6%A0%87%E8%AF%84%E6%B5%8B%E6%8A%A5%E5%91%8A-2026-03-22.md)同时记录测试集、对照模型和证据利用等指标。
 
-器见千年的 [TripoSR 引擎](C:/Users/zjz/OneDrive/Desktop/QiJianQianNian/backend/app/triposr_engine.py)调用预训练模型进行 CPU 推理，后端导出 GLB、热力图和报告。[形态测量](C:/Users/zjz/OneDrive/Desktop/QiJianQianNian/backend/app/morphology.py)从网格的 101 个水平截面提取外轮廓参数，计算口径、足径、高腹径比和腹部位置，并生成差异说明。这是项目中已有具体算法与测试支撑的部分。
+器见千年的 [TripoSR 引擎](https://github.com/jazzguan/QiJianQianNian/blob/57981905ad9b6088feaac7d5f3404a5159fa2ad1/backend/app/triposr_engine.py)调用预训练模型进行 CPU 推理，后端导出 GLB、热力图和报告。[形态测量](https://github.com/jazzguan/QiJianQianNian/blob/57981905ad9b6088feaac7d5f3404a5159fa2ad1/backend/app/morphology.py)从网格的 101 个水平截面提取外轮廓参数，计算口径、足径、高腹径比和腹部位置，并生成差异说明。这是项目中已有具体算法与测试支撑的部分。
 
 ### 文博题材与识别
 
 三彩知因已经采用“上传器物照片→提取特征→生成鉴赏报告”的流程。[分类源码](https://github.com/agno3xzy/AntiqueID/blob/master/app-django-demo/mysite/classification/views.py)包含图片预处理、颜色分析、分类预测与报告保存。
 
-器见千年的上传重建结果目前仍附带固定的元青花梅瓶元数据：[重建服务](C:/Users/zjz/OneDrive/Desktop/QiJianQianNian/src/services/PorcelainReconstructionService.ts)的真实接口分支也返回 `getPorcelainById('yuan-qinghua')`。[识别与匹配模块](C:/Users/zjz/OneDrive/Desktop/QiJianQianNian/src/mock/personalizedEvolutionData.ts)固定返回“梅瓶”，历史匹配函数没有使用传入的器型类别。因此，生成网格与后续器物身份、历史关联尚未形成真实的数据衔接。
+器见千年的上传重建结果目前仍附带固定的元青花梅瓶元数据：[重建服务](https://github.com/jazzguan/QiJianQianNian/blob/57981905ad9b6088feaac7d5f3404a5159fa2ad1/src/services/PorcelainReconstructionService.ts)的真实接口分支也返回 `getPorcelainById('yuan-qinghua')`。[识别与匹配模块](https://github.com/jazzguan/QiJianQianNian/blob/57981905ad9b6088feaac7d5f3404a5159fa2ad1/src/mock/personalizedEvolutionData.ts)固定返回“梅瓶”，历史匹配函数没有使用传入的器型类别。因此，生成网格与后续器物身份、历史关联尚未形成真实的数据衔接。
 
 ### 学习交互与交付材料
 
-乐府围绕图片识谱，将识别结果转为可操作的乐谱与播放界面，公开模型工程及答辩、演示材料。器见千年的设计报告包含“探索→观察→比较→提问→测试→记录”，目前 [应用路由](C:/Users/zjz/OneDrive/Desktop/QiJianQianNian/src/App.tsx)包含首页、重建、历史演化、形态对比、AI 讲解五个页面，尚无学习测试或个人记录页面。
+乐府围绕图片识谱，将识别结果转为可操作的乐谱与播放界面，公开模型工程及答辩、演示材料。器见千年的设计报告包含“探索→观察→比较→提问→测试→记录”，目前 [应用路由](https://github.com/jazzguan/QiJianQianNian/blob/57981905ad9b6088feaac7d5f3404a5159fa2ad1/src/App.tsx)包含首页、重建、历史演化、形态对比、AI 讲解五个页面，尚无学习测试或个人记录页面。
 
 AI 阴阳眼公开了 Android 源码和 APK，[服务端](https://github.com/Eliot-Shen/AI-YinYang-Eyes/blob/main/Server/app.py)有文件上传、模型预测和检测结果返回。器见千年的交付形态目前是 React Web 前端与 Python 后端，仓库内已有设计报告和答辩 PPT。
 
-## 当前项目实现状态
+## 2026-10-13 开发前项目状态
 
 | 功能 | 代码中的实际状态 | 源码依据 |
 | --- | --- | --- |
-| 图片三维重建 | 已接入 TripoSR 推理、任务轮询、GLB 导出；重建服务默认走真实接口 | [重建服务](C:/Users/zjz/OneDrive/Desktop/QiJianQianNian/src/services/PorcelainReconstructionService.ts)、[后端路由](C:/Users/zjz/OneDrive/Desktop/QiJianQianNian/backend/app/main.py) |
-| 重建热力图 | 按法线与固定视线方向的夹角生成启发式评分；代码未做实测误差或概率校准 | [热力图计算](C:/Users/zjz/OneDrive/Desktop/QiJianQianNian/backend/app/uncertainty.py) |
-| 形态对比 | 上传模型从 GLB 测量；五件历史参考器物从预设轮廓计算；高度统一归一化到 30 | [测量算法](C:/Users/zjz/OneDrive/Desktop/QiJianQianNian/backend/app/morphology.py)、[方法文档](C:/Users/zjz/OneDrive/Desktop/QiJianQianNian/docs/morphology-comparison.md) |
-| 历史演化 | 唐、宋、元、明、清五组样例；接口默认使用 Mock，后端未提供时间轴路由 | [时间轴接口](C:/Users/zjz/OneDrive/Desktop/QiJianQianNian/src/api/timeline.ts)、[请求开关](C:/Users/zjz/OneDrive/Desktop/QiJianQianNian/src/api/client.ts) |
-| 上传器物识别 | 固定示例元数据与“梅瓶”类别 | [识别模块](C:/Users/zjz/OneDrive/Desktop/QiJianQianNian/src/mock/personalizedEvolutionData.ts) |
-| 个性化历史匹配 | 固定参考列表，未根据上传器物类别检索 | [匹配模块](C:/Users/zjz/OneDrive/Desktop/QiJianQianNian/src/mock/personalizedEvolutionData.ts) |
-| AI 讲解与 RAG | 当前使用预设问答；后端未提供 `/ask` 路由，知识库与向量检索写在后端契约中 | [AI 接口](C:/Users/zjz/OneDrive/Desktop/QiJianQianNian/src/api/ai.ts)、[后端契约](C:/Users/zjz/OneDrive/Desktop/QiJianQianNian/docs/backend-contracts.md) |
-| 模型与用户记录 | 当前器物保存在 React Context；重建任务保存在进程内字典；设计中的学习记录未落地 | [模型状态](C:/Users/zjz/OneDrive/Desktop/QiJianQianNian/src/stores/PorcelainModelManager.tsx)、[后端任务](C:/Users/zjz/OneDrive/Desktop/QiJianQianNian/backend/app/main.py) |
+| 图片三维重建 | 已接入 TripoSR 推理、任务轮询、GLB 导出；重建服务默认走真实接口 | [重建服务](https://github.com/jazzguan/QiJianQianNian/blob/57981905ad9b6088feaac7d5f3404a5159fa2ad1/src/services/PorcelainReconstructionService.ts)、[后端路由](https://github.com/jazzguan/QiJianQianNian/blob/57981905ad9b6088feaac7d5f3404a5159fa2ad1/backend/app/main.py) |
+| 重建热力图 | 按法线与固定视线方向的夹角生成启发式评分；代码未做实测误差或概率校准 | [热力图计算](https://github.com/jazzguan/QiJianQianNian/blob/57981905ad9b6088feaac7d5f3404a5159fa2ad1/backend/app/uncertainty.py) |
+| 形态对比 | 上传模型从 GLB 测量；五件历史参考器物从预设轮廓计算；高度统一归一化到 30 | [测量算法](https://github.com/jazzguan/QiJianQianNian/blob/57981905ad9b6088feaac7d5f3404a5159fa2ad1/backend/app/morphology.py)、[方法文档](https://github.com/jazzguan/QiJianQianNian/blob/57981905ad9b6088feaac7d5f3404a5159fa2ad1/docs/morphology-comparison.md) |
+| 历史演化 | 唐、宋、元、明、清五组样例；接口默认使用 Mock，后端未提供时间轴路由 | [时间轴接口](https://github.com/jazzguan/QiJianQianNian/blob/57981905ad9b6088feaac7d5f3404a5159fa2ad1/src/api/timeline.ts)、[请求开关](https://github.com/jazzguan/QiJianQianNian/blob/57981905ad9b6088feaac7d5f3404a5159fa2ad1/src/api/client.ts) |
+| 上传器物识别 | 固定示例元数据与“梅瓶”类别 | [识别模块](https://github.com/jazzguan/QiJianQianNian/blob/57981905ad9b6088feaac7d5f3404a5159fa2ad1/src/mock/personalizedEvolutionData.ts) |
+| 个性化历史匹配 | 固定参考列表，未根据上传器物类别检索 | [匹配模块](https://github.com/jazzguan/QiJianQianNian/blob/57981905ad9b6088feaac7d5f3404a5159fa2ad1/src/mock/personalizedEvolutionData.ts) |
+| AI 讲解与 RAG | 当前使用预设问答；后端未提供 `/ask` 路由，知识库与向量检索写在后端契约中 | [AI 接口](https://github.com/jazzguan/QiJianQianNian/blob/57981905ad9b6088feaac7d5f3404a5159fa2ad1/src/api/ai.ts)、[后端契约](https://github.com/jazzguan/QiJianQianNian/blob/57981905ad9b6088feaac7d5f3404a5159fa2ad1/docs/backend-contracts.md) |
+| 模型与用户记录 | 当前器物保存在 React Context；重建任务保存在进程内字典；设计中的学习记录未落地 | [模型状态](https://github.com/jazzguan/QiJianQianNian/blob/57981905ad9b6088feaac7d5f3404a5159fa2ad1/src/stores/PorcelainModelManager.tsx)、[后端任务](https://github.com/jazzguan/QiJianQianNian/blob/57981905ad9b6088feaac7d5f3404a5159fa2ad1/backend/app/main.py) |
 
 ## 对比结论
 

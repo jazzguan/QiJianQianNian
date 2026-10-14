@@ -1,23 +1,23 @@
-# 后端接口契约 & 团队分工（历史演化 / 形态对比 / AI 讲解）
+# 后端契约：当前状态与早期设计
 
-> 面向三位分别负责「历史演化 / 形态对比 / AI 讲解」的成员。前端页面与交互已全部就绪，
-> 本文档定义你们要实现的**后端接口、数据库结构、Mock → 真实替换方式**，照着做即可并行开发。
+更新：2026-10-14。分支：`zjz`。当前接口见[API 文档](API.md)，已完成与未完成项见[分支状态](branch-status.md)。
+
+第 1、2、4–6 节保留原有数据库、接口和分工设计，第 3 节记录当前形态接口；设计中提出的 Embedding 和向量库尚未实现。当前 SQLite 表结构见[storage.py](../backend/app/storage.py)，当前检索为 TF-IDF + Atria。
 
 ## 0. 现状总览
 
 | 功能 | 前端 | 后端 / 数据 / AI |
 | --- | --- | --- |
-| 三维重建 | ✅ | ✅ 已实现（TripoSR，见 `docs/API.md` 第 9 节） |
-| 历史演化 | ✅ | ❌ 待做（当前 `mock/data.ts`） |
-| 形态对比 | ✅ | ✅ 已实现轮廓 / GLB 自动测量及对比，历史参考使用现有样例轮廓 |
-| AI 讲解 | ✅ | ❌ 待做（当前 `mock/data.ts` 的 `getPartAnswer`） |
+| 三维重建 | ✅ | ✅ 已实现（TripoSR，见[接口文档](API.md)） |
+| 历史演化 | ✅ | ✅ 20 件馆藏、朝代查询、同器型与特征匹配；数据尚未覆盖所有器型与时期 |
+| 形态对比 | ✅ | ✅ 馆藏轮廓 / 本人重建 GLB 自动测量、对比和 AI 解释；独立分支的导入与导出功能尚未合并 |
+| AI 讲解 | ✅ | ✅ TF-IDF 馆藏检索、Atria 生成与来源；向量库和扩展文献库尚未实现 |
 
-**原则**：页面只通过 `src/api/*.ts` 调数据。你改 `api/*.ts` 内部实现（Mock → `request()`），
-页面与组件**不用动**。所有共享类型在 `src/types/porcelain.ts`，勿各写一套。
+数据请求通过 `src/api/*.ts` 与重建服务封装，共享类型在 `src/types/porcelain.ts`，当前模型通过 `PorcelainModelManager` 跨页面共享。
 
 ---
 
-## 1. 数据库设计
+## 1. 早期数据库设计
 
 建议后端用 SQLite（起步）或 PostgreSQL，表结构如下（与 `types/porcelain.ts` 对齐）：
 
@@ -82,7 +82,7 @@
 
 ---
 
-## 2. 历史演化 —— 接口契约
+## 2. 历史演化 —— 早期接口设计
 
 负责人：**成员 A**。目标：真实瓷器数据集 + 朝代/器物查询 + 个性化匹配。
 
@@ -108,19 +108,20 @@
 | 方法 | 路径 | 请求 | 响应 |
 | --- | --- | --- | --- |
 | POST | `/api/measure` | `{ modelUrl }` 或 `{ artifactId }` | `MorphologyMeasurement` |
-| POST | `/api/compare` | `{ leftId, rightId, leftModelUrl?, rightModelUrl? }` | `ComparisonPair`（含两侧测量结果、参数表、洞察及标签） |
+| POST | `/api/compare` | `{ leftId, rightId, leftModelUrl?, rightModelUrl? }` | `ComparisonPair`（含两侧测量结果、参数表、洞察、标签及馆藏来源） |
+| POST | `/api/compare/explain` | 同上 | `{answer, sources}`，Atria 差异解释 |
 
 `MorphologyMeasurement`：高度、最大腹径、口径、足径、高腹径比、腹部位置、归一化轮廓、数据来源与测量方法，类型定义见 `src/types/porcelain.ts`。
 
-后端实现：`backend/app/morphology.py` + `morphology_routes.py`。历史参考目录位于 `morphology_catalog.json`，使用项目已有五件器物的示例轮廓。上传模式测量实际重建 GLB。
+后端实现：`backend/app/morphology.py` + `morphology_routes.py`。历史参考通过 `storage.artifacts()` 读取20件真实馆藏的照片轮廓，种子位于 `backend/data/artifacts.json`。上传模式测量本人实际重建 GLB。
 
-前端实现：`src/api/comparison.ts` 调用测量服务；`src/pages/Comparison/index.tsx` 提供左右选择、加载 / 错误 / 重试、参数和洞察；`CompareViewer` 支持上传 GLB。
+前端实现：`src/api/comparison.ts` 调用测量服务；`src/pages/Comparison/index.tsx` 提供左右选择、加载 / 错误 / 重试、参数和洞察；`CompareViewer` 展示重建 GLB 与馆藏模型，支持同步视角和部位对齐。
 
 运行方式、测量定义和完整接口见 [形态对比](./morphology-comparison.md)。
 
 ---
 
-## 4. AI 讲解 —— 接口契约
+## 4. AI 讲解 —— 早期接口设计
 
 负责人：**成员 C**。目标：瓷器知识库 + RAG + LLM 生成讲解。
 
@@ -142,7 +143,7 @@
 
 ---
 
-## 5. 分工与依赖
+## 5. 早期分工与依赖
 
 ```
 成员 A（历史演化·数据）  ──先做，是地基
@@ -153,7 +154,7 @@
 - **成员 A** 先交付数据集 + 查询接口（`mock/data.ts` 里的 5 件瓷器可直接作为首批数据）。
 - **成员 B / C** 在 A 的接口就绪后并行开发。
 
-## 6. 前端已就绪的协作接口（直接用，别重复造）
+## 6. 早期前端协作设计
 
 - `src/types/porcelain.ts` —— 统一类型。
 - `src/api/timeline.ts` / `comparison.ts` / `ai.ts` —— 各改各的，内部 Mock → `request()`。
