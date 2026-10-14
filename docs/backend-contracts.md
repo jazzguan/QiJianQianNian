@@ -1,19 +1,19 @@
-# 后端接口契约 & 团队分工（历史演化 / 形态对比 / AI 讲解）
+# 后端契约与功能状态
 
-> 面向三位分别负责「历史演化 / 形态对比 / AI 讲解」的成员。前端页面与交互已全部就绪，
-> 本文档定义你们要实现的**后端接口、数据库结构、Mock → 真实替换方式**，照着做即可并行开发。
+更新：2026-10-14。分支：`codex/morphology-comparison`。已完成与未完成项见[分支状态](branch-status.md)，实际接口见[API 文档](API.md)。
+
+形态对比已实现。下文保留原有历史演化、AI 讲解、数据库及分工设计，这些模块仍待接入真实数据与后端。
 
 ## 0. 现状总览
 
 | 功能 | 前端 | 后端 / 数据 / AI |
 | --- | --- | --- |
-| 三维重建 | ✅ | ✅ 已实现（TripoSR，见 `docs/API.md` 第 9 节） |
+| 三维重建 | ✅ | ✅ 已实现（TripoSR，见[接口文档](API.md)） |
 | 历史演化 | ✅ | ❌ 待做（当前 `mock/data.ts`） |
 | 形态对比 | ✅ | ✅ 自动测量、GLB导入、归一化和规则差异分析，见[实现文档](morphology-comparison.md) |
 | AI 讲解 | ✅ | ❌ 待做（当前 `mock/data.ts` 的 `getPartAnswer`） |
 
-**原则**：页面只通过 `src/api/*.ts` 调数据。你改 `api/*.ts` 内部实现（Mock → `request()`），
-页面与组件**不用动**。所有共享类型在 `src/types/porcelain.ts`，勿各写一套。
+共享类型在 `src/types/porcelain.ts`，当前器物通过 `PorcelainModelManager` 跨页面共享。形态对比请求层已使用真实接口，历史演化与 AI 讲解仍按下面契约待开发。
 
 ---
 
@@ -109,12 +109,15 @@
 
 | 方法 | 路径 | 请求 | 响应 |
 | --- | --- | --- | --- |
-| POST | `/api/measure` | `{ modelUrl }` 或上传 mesh | `{height, maxBellyDiameter, mouthDiameter, footDiameter, heightBellyRatio, bellyPosition}` |
-| POST | `/api/compare` | `{ leftId, rightId }` | `{ rows: ComparisonRow[], insight, leftLabel, rightLabel }` |
+| GET | `/api/comparison/artifacts` | — | 内置示例与本机导入目录 |
+| POST | `/api/measure` | `{ modelUrl }` 或 `{ artifactId }` | 六项测量与归一化截面轮廓 |
+| POST | `/api/measure/upload` | multipart `file / upAxis` | 测量、器物和归一化 GLB 地址 |
+| GET | `/api/comparison/models/{id}.glb` | — | 导入的归一化 GLB |
+| POST | `/api/compare` | `{ leftId, rightId, leftModelUrl?, rightModelUrl? }` | 参数表、规则洞察、双方器物和测量结果 |
 
 `ComparisonRow`：`{label, left, right}`（如 高度/最大腹径/口径/高腹径比）。
 
-**关键工作**：写一个网格测量模块——从 GLB/`trimesh` 提取：
+**已实现测量**：网格测量模块从 GLB/`trimesh` 提取：
 - `height`：y 轴范围；
 - `maxBellyDiameter`：最大截面直径；
 - `mouthDiameter`：顶部口沿截面直径；
@@ -124,7 +127,7 @@
 
 尺寸需归一化后再对比；洞察文案可基于参数差值规则生成。**测量值必须标注为"自动提取"，非权威实测。**
 
-**前端替换位置**：`src/api/comparison.ts` 的 `fetchComparisonPair`（`src/pages/Comparison/index.tsx` 里的 `paramRows` 是前端算的示例，可换成后端返回）。
+**当前前端**：`src/api/comparison.ts` 已调用目录、导入和对比接口；`src/pages/Comparison/index.tsx` 使用后端测量数据展示参数、轮廓和差异，支持 GLB 导入与 CSV 导出。
 
 ---
 

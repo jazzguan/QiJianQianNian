@@ -7,6 +7,8 @@
 
 四个核心功能：三维复原 · 历史演化 · 形态对比 · AI 讲解。
 
+分支：`codex/morphology-comparison`。已完成、未完成、数据缺口及与 `zjz` 的区别见[分支完成情况](docs/branch-status.md)。本分支增强形态对比，历史演化和 AI 讲解仍使用原有 Mock。
+
 ---
 
 ## 技术栈
@@ -142,9 +144,9 @@ D:\软创
 
 | 成员 | 负责 |
 | --- | --- |
-| 前端 + 三维重建 | ✅ 已完成 |
-| 历史演化（时空数据 + 知识库） | `docs/backend-contracts.md` §2 |
-| 形态对比（3D 形态测量） | `docs/backend-contracts.md` §3 |
-| AI 讲解（RAG + LLM） | `docs/backend-contracts.md` §4 |
+| 前端 + 三维重建 | 保留原有真实 TripoSR 服务；器物识别仍为示例逻辑 |
+| 历史演化（时空数据 + 知识库） | 待实现真实数据与匹配；当前为 Mock |
+| 形态对比（3D 形态测量） | ✅ 测量、GLB 导入、同步、定位、轮廓叠加、CSV；[数据缺口](docs/branch-status.md) |
+| AI 讲解（RAG + LLM） | 待实现；当前为预设问答 |
 
-各功能的**前端已就绪**，后端成员按契约实现接口、把 `src/api/*.ts` 里的 Mock 换成真实调用即可，页面无需改动。
+形态对比已接入真实测量接口。历史演化与 AI 讲解的真实后端仍待实现，原设计见[后端契约](docs/backend-contracts.md)。
