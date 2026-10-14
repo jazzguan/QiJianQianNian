@@ -20,6 +20,12 @@
 
 ## 快速开始
 
+### 独立运行形态对比
+
+在项目根目录执行 `./start-comparison.ps1`，打开 `http://127.0.0.1:8001/comparison`。
+支持六项自动测量、GLB导入、同步交互、关键区域定位、轮廓叠加与CSV导出。
+运行方式和接口见[形态对比文档](docs/morphology-comparison.md)。
+
 ### 环境要求
 - Node.js ≥ 18（推荐 20+）
 - Anaconda / conda

@@ -2,7 +2,7 @@
 
 本文档面向后续多人协作开发，说明公共模块、共享数据类型、Mock 数据组织方式，以及未来接入真实后端时需要替换的位置。
 
-> 当前阶段**只有前端**，所有"AI / 重建 / 识别"均为 Mock 模拟，不调用真实算法。
+> 形态对比已接入真实测量接口，见[形态对比文档](morphology-comparison.md)；三维重建使用原有TripoSR服务，其他模块仍沿用原实现。
 
 ---
 
@@ -169,7 +169,7 @@ interface PersonalizedMatch { dynasty: DynastyId; porcelainId: string | null; di
 
 **三维重建已实现真实后端**（Python + TripoSR，见第 9 节），`PorcelainReconstructionService` 默认调用它（地址 `VITE_RECONSTRUCT_BASE`，默认 `http://localhost:8000`）；设 `VITE_USE_MOCK=true` 回退前端 Mock。
 
-其余数据接口（时间轴 / 对比 / AI 问答）仍为前端 Mock，未来后端实现以下接口即可：
+时间轴与AI问答仍为前端Mock；形态对比已实现，下表保留其他模块的接口契约：
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |

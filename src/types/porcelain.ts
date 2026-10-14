@@ -38,7 +38,7 @@ export interface PorcelainPart {
 export interface Porcelain {
   id: string
   name: string
-  dynasty: DynastyId
+  dynasty: DynastyId | null
   dynastyName: string
   period: string
   summary: string
@@ -47,12 +47,15 @@ export interface Porcelain {
   glaze: GlazeStyle
   /** 未来后端返回的真实 GLB 地址，前端优先使用，缺省时回退到程序化轮廓 */
   modelUrl?: string
+  measurementSource?: 'profile' | 'mesh'
   imageUrl?: string
   params: PorcelainParams
   formFeatures: string[]
   decorationFeatures: string[]
   craftFeatures: string[]
   history: string
+  material?: string
+  use?: string
   parts: PorcelainPart[]
 }
 
@@ -84,6 +87,31 @@ export interface ComparisonPair {
   rightId: string
   rows: ComparisonRow[]
   insight: string
+  left?: Porcelain
+  right?: Porcelain
+  leftLabel?: string
+  rightLabel?: string
+  leftMeasurement?: MorphologyMeasurement
+  rightMeasurement?: MorphologyMeasurement
+}
+
+export interface MorphologyMeasurement extends PorcelainParams {
+  heightBellyRatio: number
+  bellyPosition: number
+  bellyPositionLabel: string
+  shape: ShapeProfile
+  source: 'profile' | 'mesh'
+  method: '自动提取'
+  unit: string
+}
+
+export interface ComparisonRequest {
+  leftId?: string
+  rightId?: string
+  leftModelUrl?: string
+  rightModelUrl?: string
+  leftLabel?: string
+  rightLabel?: string
 }
 
 export interface AIAnswer {

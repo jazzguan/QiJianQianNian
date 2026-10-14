@@ -22,6 +22,8 @@ from .uncertainty import (
 )
 
 app = FastAPI(title="器见千年 · 三维重建服务")
+from .morphology_routes import router as morphology_router
+app.include_router(morphology_router)
 
 app.add_middleware(
     CORSMiddleware,

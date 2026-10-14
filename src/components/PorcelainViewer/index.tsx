@@ -11,6 +11,7 @@ export interface SyncState {
   position: [number, number, number]
   target: [number, number, number]
   from: string
+  anchorY?: number
 }
 
 export interface PorcelainViewerProps {
@@ -38,6 +39,9 @@ export interface PorcelainViewerProps {
   viewId?: string
   syncEnabled?: boolean
   syncRef?: MutableRefObject<SyncState | null>
+  framingRadius?: number
+  focusRegion?: { yMin: number; yMax: number }
+  normalizeModel?: boolean
 }
 
 const DEFAULT_SHAPE: PorcelainShape = [
@@ -169,26 +173,28 @@ function HighlightSegment({ shape, region }: { shape: PorcelainShape; region: { 
   )
 }
 
-function GLTFModel({ url, visible = true }: { url: string; visible?: boolean }) {
+function GLTFModel({ url, visible = true, normalize = false, region }: { url: string; visible?: boolean; normalize?: boolean; region?: { yMin: number; yMax: number } }) {
   const { scene } = useGLTF(url)
-  useEffect(() => {
-    scene.visible = visible
-    scene.traverse((obj) => {
+  const copy = useMemo(() => scene.clone(true), [scene])
+  const box = useMemo(() => new THREE.Box3().setFromObject(copy), [copy])
+  const scale = normalize ? 30 / Math.max(box.max.y - box.min.y, .001) : 1
+  const center = box.getCenter(new THREE.Vector3())
+  const overlay = useMemo(() => {
+    if (!region) return null
+    const clone = copy.clone(true)
+    clone.traverse(obj => {
+      if (!(obj as THREE.Mesh).isMesh) return
       const mesh = obj as THREE.Mesh
-      if ((mesh as { isMesh?: boolean }).isMesh) {
-        const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
-        mats.forEach((mat) => {
-          const m = mat as THREE.MeshStandardMaterial
-          if (m && m.isMaterial) {
-            m.vertexColors = true
-            m.side = THREE.DoubleSide
-            m.needsUpdate = true
-          }
-        })
-      }
+      mesh.material = new THREE.MeshBasicMaterial({ color: '#c9a96b', transparent: true, opacity: .25,
+        side: THREE.DoubleSide, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1,
+        clippingPlanes: [new THREE.Plane(new THREE.Vector3(0,1,0), -region.yMin), new THREE.Plane(new THREE.Vector3(0,-1,0), region.yMax)] })
     })
-  }, [scene, visible])
-  return <primitive object={scene} />
+    return clone
+  }, [copy, region?.yMin, region?.yMax])
+  useEffect(() => () => { overlay?.traverse(obj => { if ((obj as THREE.Mesh).isMesh) ((obj as THREE.Mesh).material as THREE.Material).dispose() }) }, [overlay])
+  return <group visible={visible} scale={scale} position={normalize ? [-center.x*scale, -box.min.y*scale, -center.z*scale] : [0,0,0]}>
+    <primitive object={copy} />{overlay && <primitive object={overlay} />}
+  </group>
 }
 
 function LoadingFallback() {
@@ -217,6 +223,7 @@ function Rig({
   syncEnabled,
   syncRef,
   viewId,
+  focusRegion,
 }: {
   bounds: { minY: number; maxY: number; maxR: number }
   resetToken: number
@@ -225,25 +232,28 @@ function Rig({
   syncEnabled?: boolean
   syncRef?: MutableRefObject<SyncState | null>
   viewId?: string
+  focusRegion?: { yMin: number; yMax: number }
 }) {
   const { camera } = useThree()
 
   useEffect(() => {
-    if (resetToken <= 0) return
-    const targetY = (bounds.maxY + bounds.minY) / 2
-    camera.position.set(0, targetY, cameraDistance)
+    if (resetToken <= 0 && !focusRegion) return
+    const targetY = focusRegion ? (focusRegion.yMin + focusRegion.yMax) / 2 : (bounds.maxY + bounds.minY) / 2
+    camera.position.set(0, targetY, focusRegion ? Math.max(bounds.maxR*3, cameraDistance*.55) : cameraDistance)
     if (controlsRef.current) {
       controlsRef.current.target.set(0, targetY, 0)
       controlsRef.current.update()
     }
-  }, [resetToken, bounds, cameraDistance, camera, controlsRef])
+  }, [resetToken, bounds, cameraDistance, camera, controlsRef, focusRegion?.yMin, focusRegion?.yMax])
 
   useFrame(() => {
     if (!syncEnabled || !syncRef?.current || !controlsRef.current) return
     const s = syncRef.current
     if (s.from === viewId) return
-    camera.position.lerp(_v1.set(s.position[0], s.position[1], s.position[2]), 0.35)
-    controlsRef.current.target.lerp(_v2.set(s.target[0], s.target[1], s.target[2]), 0.35)
+    const anchor = focusRegion ? (focusRegion.yMin + focusRegion.yMax)/2 : (bounds.maxY + bounds.minY)/2
+    const offset = anchor - (s.anchorY ?? anchor)
+    camera.position.copy(_v1.set(s.position[0], s.position[1]+offset, s.position[2]))
+    controlsRef.current.target.copy(_v2.set(s.target[0], s.target[1]+offset, s.target[2]))
     controlsRef.current.update()
   })
 
@@ -288,6 +298,9 @@ export function PorcelainViewer(props: PorcelainViewerProps) {
     viewId,
     syncEnabled,
     syncRef,
+    framingRadius,
+    focusRegion,
+    normalizeModel = false,
   } = props
 
   const [autoRotate, setAutoRotate] = useState(props.autoRotate ?? false)
@@ -299,19 +312,21 @@ export function PorcelainViewer(props: PorcelainViewerProps) {
 
   const bounds = useMemo(() => computeBounds(resolvedShape), [resolvedShape])
   const targetY = (bounds.maxY + bounds.minY) / 2
-  const cameraDistance = Math.max(bounds.maxR * 4.5, bounds.maxY * 1.9, 38)
+  const cameraDistance = Math.max((framingRadius ?? bounds.maxR) * 4.5, bounds.maxY * 1.9, 38)
 
   const selectedPart = parts?.find((p) => p.id === selectedPartId)
-  const highlightRegion = selectedPart ? { yMin: selectedPart.yMin, yMax: selectedPart.yMax } : undefined
+  const highlightRegion = focusRegion ?? (selectedPart ? { yMin: selectedPart.yMin, yMax: selectedPart.yMax } : undefined)
 
   const handleChange = () => {
     const c = controlsRef.current
     if (!c || !syncEnabled || !syncRef || !viewId) return
+    if (syncRef.current?.from !== viewId) return
     const cam = c.object as THREE.PerspectiveCamera
     syncRef.current = {
       position: [cam.position.x, cam.position.y, cam.position.z],
       target: [c.target.x, c.target.y, c.target.z],
       from: viewId,
+      anchorY: focusRegion ? (focusRegion.yMin + focusRegion.yMax)/2 : targetY,
     }
   }
 
@@ -330,7 +345,7 @@ export function PorcelainViewer(props: PorcelainViewerProps) {
       <Canvas
         dpr={[1, 2]}
         camera={{ position: [0, targetY, cameraDistance], fov: 40 }}
-        gl={{ antialias: true, alpha: true }}
+        gl={{ antialias: true, alpha: true, localClippingEnabled: true }}
       >
         <ambientLight intensity={1.4} />
         <hemisphereLight args={['#ffffff', '#d8d2c2', 0.7]} />
@@ -340,8 +355,8 @@ export function PorcelainViewer(props: PorcelainViewerProps) {
 
         <Suspense fallback={<LoadingFallback />}>
           {modelUrl && (
-            <ModelErrorBoundary fallback={vessel}>
-              <GLTFModel url={modelUrl} visible={!showHeatmap} />
+            <ModelErrorBoundary key={modelUrl} fallback={normalizeModel ? <Html center><p className="whitespace-nowrap text-sm">模型加载失败，请重新导入</p></Html> : vessel}>
+              <GLTFModel url={modelUrl} visible={!showHeatmap} normalize={normalizeModel} region={highlightRegion} />
             </ModelErrorBoundary>
           )}
           {heatmapUrl && (
@@ -375,11 +390,19 @@ export function PorcelainViewer(props: PorcelainViewerProps) {
           enablePan={false}
           enableRotate={interactive}
           enableZoom={interactive}
-          minDistance={bounds.maxR * 2.2}
+          minDistance={(framingRadius ?? bounds.maxR) * 2.2}
           maxDistance={cameraDistance * 2.2}
           autoRotate={autoRotate}
           autoRotateSpeed={1.1}
           onChange={handleChange}
+          onStart={() => {
+            const c = controlsRef.current
+            if (c && syncEnabled && syncRef && viewId) {
+              syncRef.current = { position: [c.object.position.x,c.object.position.y,c.object.position.z],
+                target: [c.target.x,c.target.y,c.target.z], from: viewId,
+                anchorY: focusRegion ? (focusRegion.yMin+focusRegion.yMax)/2 : targetY }
+            }
+          }}
         />
 
         <Rig
@@ -390,6 +413,7 @@ export function PorcelainViewer(props: PorcelainViewerProps) {
           syncEnabled={syncEnabled}
           syncRef={syncRef}
           viewId={viewId}
+          focusRegion={focusRegion}
         />
       </Canvas>
 

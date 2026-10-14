@@ -9,7 +9,7 @@
 | --- | --- | --- |
 | 三维重建 | ✅ | ✅ 已实现（TripoSR，见 `docs/API.md` 第 9 节） |
 | 历史演化 | ✅ | ❌ 待做（当前 `mock/data.ts`） |
-| 形态对比 | ✅ | ❌ 待做（当前 `mock/data.ts` 的 `comparisonPair`） |
+| 形态对比 | ✅ | ✅ 自动测量、GLB导入、归一化和规则差异分析，见[实现文档](morphology-comparison.md) |
 | AI 讲解 | ✅ | ❌ 待做（当前 `mock/data.ts` 的 `getPartAnswer`） |
 
 **原则**：页面只通过 `src/api/*.ts` 调数据。你改 `api/*.ts` 内部实现（Mock → `request()`），
@@ -102,6 +102,8 @@
 ---
 
 ## 3. 形态对比 —— 接口契约
+
+接口已实现于 `backend/app/morphology_routes.py`。目录示例从原有五件器物轮廓测量；导入或重建的GLB从实际网格截面测量。独立运行、完整返回字段与验证方式见[形态对比文档](morphology-comparison.md)。
 
 负责人：**成员 B**。目标：从 3D 网格自动测量形态参数 + 跨时期对比。
 

@@ -3,3 +3,6 @@ dist/
 .env
 *.log
 .DS_Store
+backend/comparison-models/
+backend/.venv-morphology/
+**/__pycache__/
