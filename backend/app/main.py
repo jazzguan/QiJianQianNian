@@ -20,6 +20,7 @@ from .uncertainty import (
     orient_upright,
     vertex_uncertainty,
 )
+from .timeline import router as timeline_router
 
 app = FastAPI(title="器见千年 · 三维重建服务")
 
@@ -30,6 +31,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(timeline_router)
 
 # task_id -> {"status", "model_url", "heatmap_url", "report", "shape", "error"}
 tasks: dict = {}

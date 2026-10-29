@@ -70,3 +70,39 @@ cd backend
 - 无 GPU，单张约 1–3 分钟（分辨率 256）。
 - 背面/底部为模型推断结果，不代表真实文物数据。
 - 首次运行需联网下载权重与 rembg 的 u2net 模型。
+
+## 7. 历史演化接口（本地 JSON 数据）
+
+历史演化功能当前使用 `backend/data/timeline.json`，不依赖外部数据库。
+服务启动后提供以下接口：
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | `/api/timeline` | 返回唐、宋、元、明、清朝代列表 |
+| GET | `/api/timeline/{dynasty}` | 返回指定朝代的代表瓷器 |
+| GET | `/api/porcelain/{porcelain_id}` | 按 ID 返回瓷器详情 |
+| POST | `/api/evolution/match` | 按器型类别返回跨朝代匹配结果 |
+
+匹配请求示例：
+
+```json
+{"category": "梅瓶"}
+```
+
+匹配响应格式：
+
+```json
+{
+  "matches": [
+    {
+      "dynasty": "yuan",
+      "porcelainId": "yuan-qinghua",
+      "difference": "与上传器物同属元代青花梅瓶，器型最为接近，可作为同期参照。"
+    }
+  ]
+}
+```
+
+该本地数据方案便于当前分支开发和演示。后续接入 SQLite 或 PostgreSQL 时，保持上述接口结构即可替换数据访问层。
+
+前端开发服务器已配置 `/api` 到 `http://localhost:8000` 的代理。将 `VITE_USE_MOCK=false` 后，历史演化页面会请求本地 FastAPI 接口；保持默认值则继续使用前端 Mock 数据。

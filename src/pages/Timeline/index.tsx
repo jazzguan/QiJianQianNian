@@ -1,13 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Timeline } from '../../components/Timeline'
 import { PorcelainViewer } from '../../components/PorcelainViewer'
 import { EvolutionModeSwitch } from '../../components/EvolutionModeSwitch'
 import { HistoricalPorcelainCard } from '../../components/HistoricalPorcelainCard'
-import { fetchDynastyPorcelain, fetchTimeline } from '../../api/timeline'
-import { getPorcelainById } from '../../mock/data'
-import { getPersonalizedMatches } from '../../mock/personalizedEvolutionData'
+import { fetchDynastyPorcelain, fetchPersonalizedMatches, fetchPorcelain, fetchTimeline } from '../../api/timeline'
 import { usePorcelainModel } from '../../stores/PorcelainModelManager'
-import type { DynastyId, DynastyInfo, Porcelain } from '../../types/porcelain'
+import type { DynastyId, DynastyInfo, PersonalizedMatch, Porcelain } from '../../types/porcelain'
 
 function FeatureList({ title, items }: { title: string; items: string[] }) {
   return (
@@ -33,19 +31,39 @@ export default function TimelinePage() {
   const [activeId, setActiveId] = useState<DynastyId>('tang')
   const [porcelain, setPorcelain] = useState<Porcelain | null>(null)
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [matches, setMatches] = useState<PersonalizedMatch[]>([])
+  const [reference, setReference] = useState<Porcelain | null>(null)
+  const [personalizedLoading, setPersonalizedLoading] = useState(false)
 
   useEffect(() => {
-    fetchTimeline().then(setDynasties)
+    let alive = true
+    fetchTimeline()
+      .then((items) => {
+        if (alive) setDynasties(items)
+      })
+      .catch(() => {
+        if (alive) setError('历史朝代数据加载失败，请确认后端服务已启动。')
+      })
+    return () => {
+      alive = false
+    }
   }, [])
 
   useEffect(() => {
     if (personalized) return
     let alive = true
     setLoading(true)
+    setError(null)
     fetchDynastyPorcelain(activeId).then((p) => {
       if (!alive) return
       setPorcelain(p)
       setLoading(false)
+    }).catch(() => {
+      if (!alive) return
+      setPorcelain(null)
+      setLoading(false)
+      setError('该朝代的瓷器数据加载失败。')
     })
     return () => {
       alive = false
@@ -54,12 +72,56 @@ export default function TimelinePage() {
 
   const activeDynasty = dynasties.find((d) => d.id === activeId)
 
-  const matches = useMemo(
-    () => (current?.recognition ? getPersonalizedMatches(current.recognition.category) : []),
-    [current],
-  )
+  useEffect(() => {
+    if (!personalized || !current?.recognition) {
+      setMatches([])
+      setReference(null)
+      return
+    }
+    let alive = true
+    setPersonalizedLoading(true)
+    setError(null)
+    fetchPersonalizedMatches(current.recognition.category)
+      .then((items) => {
+        if (alive) setMatches(items)
+      })
+      .catch(() => {
+        if (alive) setError('个性化历史匹配加载失败。')
+      })
+      .finally(() => {
+        if (alive) setPersonalizedLoading(false)
+      })
+    return () => {
+      alive = false
+    }
+  }, [personalized, current?.recognition?.category])
+
   const activeMatch = matches.find((m) => m.dynasty === activeId)
-  const activeReference = activeMatch?.porcelainId ? getPorcelainById(activeMatch.porcelainId) : null
+
+  useEffect(() => {
+    if (!activeMatch?.porcelainId) {
+      setReference(null)
+      return
+    }
+    let alive = true
+    setPersonalizedLoading(true)
+    fetchPorcelain(activeMatch.porcelainId)
+      .then((item) => {
+        if (alive) setReference(item)
+      })
+      .catch(() => {
+        if (alive) {
+          setReference(null)
+          setError('历史参考瓷器详情加载失败。')
+        }
+      })
+      .finally(() => {
+        if (alive) setPersonalizedLoading(false)
+      })
+    return () => {
+      alive = false
+    }
+  }, [activeMatch?.porcelainId])
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-12">
@@ -67,6 +129,8 @@ export default function TimelinePage() {
       <p className="mt-2 text-sm text-ink-soft">
         从不同历史时期的瓷器中，观察器型、纹饰与工艺的变化。
       </p>
+
+      {error && <p className="mt-4 text-sm text-red-700">{error}</p>}
 
       {personalized && (
         <div className="mt-6">
@@ -111,8 +175,12 @@ export default function TimelinePage() {
           </div>
 
           {/* 历史参考案例 / 空状态 */}
-          {activeReference ? (
-            <HistoricalPorcelainCard porcelain={activeReference} difference={activeMatch?.difference} />
+          {personalizedLoading ? (
+            <div className="panel flex h-40 items-center justify-center p-6 text-center text-sm text-ink-soft">
+              加载历史匹配中…
+            </div>
+          ) : reference ? (
+            <HistoricalPorcelainCard porcelain={reference} difference={activeMatch?.difference} />
           ) : (
             <div className="panel flex h-40 items-center justify-center p-6 text-center text-sm text-ink-soft">
               {activeMatch?.emptyReason ?? '暂未找到可靠的同类参考案例'}
