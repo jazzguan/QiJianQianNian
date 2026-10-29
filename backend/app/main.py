@@ -50,8 +50,8 @@ def _run_task(task_id, image_bytes):
             update(task_id,stage='器物识别',progress=8)
             recognition = inspect_image(image_bytes)
             update(task_id,recognition=recognition,stage='加载三维模型',progress=20)
-            from .triposr_engine import reconstruct
-            mesh = reconstruct(image_bytes,lambda stage,value: update(task_id,stage=stage,progress=value))
+            from .reconstruction_engine import reconstruct
+            mesh, engine = reconstruct(image_bytes,lambda stage,value: update(task_id,stage=stage,progress=value))
             MODEL_LOADED = True
             update(task_id,stage='网格与纹理处理',progress=82)
             mesh = normalize_mesh(orient_upright(mesh),config.DISPLAY_HEIGHT)
@@ -74,13 +74,13 @@ def _run_task(task_id, image_bytes):
             porcelain = dict(id=task_id,name=recognition['type'],dynasty='unknown',dynastyName='年代未定',period='',
                 category=recognition['category'],summary=recognition['note'],description=recognition['note'],history='',
                 formFeatures=recognition['features'],decorationFeatures=recognition['decorationFeatures'],craftFeatures=[],
-                shape=shape,params=params,parts=parts,sources=[],modelMethod='TripoSR 单图重建 + 前后镜像纹饰',textureProjection=projection,
+                shape=shape,params=params,parts=parts,sources=[],modelMethod=f'{engine.upper()} 单图重建 + 前后镜像纹饰',textureProjection=projection,
                 imageUrl=f'/files/{task_id}/image.jpg',modelUrl=f'/files/{task_id}/mesh.glb?v=photo-{PHOTO_SURFACE_VERSION}',
                 glaze={'color':'#ede5d3','roughness':.38,'metalness':.05,'clearcoat':.5,'decoration':'plain'})
             update(task_id,status='success',stage='完成',progress=100,porcelain=porcelain,shape=shape,
                    report={**report,'elapsedMs':int((time.time()-started)*1000)},textureProjection=projection,
                    modelUrl=f'/files/{task_id}/mesh.glb?v=photo-{PHOTO_SURFACE_VERSION}',previewUrl=f'/files/{task_id}/preview.glb?v=photo-{PHOTO_SURFACE_VERSION}',
-                   heatmapUrl=f'/files/{task_id}/heatmap.glb',note='TripoSR 单图重建 · 浏览网格已简化')
+                   heatmapUrl=f'/files/{task_id}/heatmap.glb',note=f'{engine.upper()} 单图重建 · 浏览网格已简化')
     except Exception as exc:
         task = storage.reconstruction(task_id)
         if task and task['status'] != 'cancelled': update(task_id,status='error',error=str(exc)[:600],stage='失败')
@@ -98,7 +98,10 @@ def startup():
 
 
 @app.get('/health')
-def health(): return {'ok':True,'modelLoaded':MODEL_LOADED,**provider_status()}
+def health():
+    from .reconstruction_engine import status
+    from .triposr_engine import selected_device
+    return {'ok':True,'modelLoaded':MODEL_LOADED,'device':selected_device(),**status(),**provider_status()}
 
 
 @app.post('/api/reconstruct')

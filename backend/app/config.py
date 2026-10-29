@@ -5,6 +5,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # TripoSR 仓库克隆目录（含 tsr 包）
 TRIPOSR_DIR = os.path.join(BASE_DIR, "TripoSR")
+SF3D_DIR = os.path.join(BASE_DIR, "SF3D")
 
 # 生成产物目录
 OUTPUT_DIR = os.path.join(BASE_DIR, "outputs")

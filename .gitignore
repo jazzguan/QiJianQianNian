@@ -8,6 +8,7 @@ backend/data/translations.json
 backend/outputs/
 backend/cache/
 backend/TripoSR/
+backend/SF3D/
 *.log
 .DS_Store
 backend/.venv/

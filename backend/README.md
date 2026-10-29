@@ -1,6 +1,6 @@
 # 后端运行与 API
 
-后端采用 FastAPI、SQLite、Gemini、Atria 与 TripoSR。安装和启动步骤见项目根目录 README。
+后端采用 FastAPI、SQLite、Gemini、Atria 与 GPU 加速的 TripoSR。安装和启动步骤见项目根目录 README。
 
 ## 接口
 
@@ -40,7 +40,7 @@
 
 ## 模型与形态
 
-TripoSR使用CPU，默认等值面分辨率128。完整网格用于几何测量，浏览版本简化至最多18,000面；两个版本均嵌入原照片的正面纹饰贴图。三维展示统一高度30；实际馆藏尺寸保留在measurementsText。
+TripoSR 默认自动选择 CUDA，未检测到兼容 GPU 时回退 CPU；默认等值面分辨率128。完整网格用于几何测量，浏览版本简化至最多18,000面；两个版本均嵌入原照片的正面纹饰贴图。三维展示统一高度30；实际馆藏尺寸保留在measurementsText。
 
 photo_surface.py将正面照片投影到模型，并关于前后分界平面镜像到背面，按器物高度和水平曲面位置计算UV，保持侧面衔接。GLB采用KHR_materials_unlit，避免照片中已有的明暗被二次照明改变。update_surfaces.py可在本机为已下载的馆藏及已完成的上传模型重新生成纹理，无需再次调用云端服务。
 

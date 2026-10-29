@@ -76,7 +76,7 @@ function ProfileChart({ left, right }: { left: MorphologyMeasurement; right: Mor
 }
 
 function exportCsv(pair: ComparisonPair) {
-  const escape = (value: string) => `"${value.replaceAll('"', '""')}"`
+  const escape = (value: string) => `"${value.replace(/"/g, '""')}"`
   const csv = ['参数,左侧,右侧', ...pair.rows.map((row) => [row.label, row.left, row.right].map(escape).join(','))].join('\r\n')
   const url = URL.createObjectURL(new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' }))
   const link = document.createElement('a'); link.href = url; link.download = '器见千年-形态对比.csv'; link.click()

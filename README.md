@@ -14,17 +14,17 @@ npm run build
 ./start.ps1
 ```
 
-打开 http://127.0.0.1:8000 。当前电脑已经安装后端依赖并下载重建权重。服务同时提供前端页面与 API；开发时可另行运行 `npm run dev`，Vite 将 API、图片和模型请求转发至 8000 端口。
+打开 http://127.0.0.1:8000 。启动脚本优先使用 `qjqn-gpu` Conda 环境；首次重建时才会下载模型权重。服务同时提供前端页面与 API；开发时可另行运行 `npm run dev`，Vite 将 API、图片和模型请求转发至 8000 端口。
 
 ## 新环境安装
 
-需要 Python 3.12、Node.js 20 或更高版本。
+推荐 Python 3.10、Node.js 20 或更高版本。RTX 4060 8GB 等 NVIDIA 显卡使用 CUDA 环境：
 
 ```powershell
-python -m venv backend/.venv
-& backend/.venv/Scripts/python.exe -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
-& backend/.venv/Scripts/python.exe -m pip install -r backend/requirements.txt
-& backend/.venv/Scripts/python.exe backend/setup_triposr.py
+conda create -n qjqn-gpu python=3.10 pip -y
+conda run -n qjqn-gpu python -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124
+conda run -n qjqn-gpu python -m pip install -r backend/requirements.txt
+conda run -n qjqn-gpu python backend/setup_triposr.py
 Copy-Item backend/.env.example backend/.env
 ```
 
@@ -35,9 +35,12 @@ Copy-Item backend/.env.example backend/.env
 | ATRIA_BASE_URL / ATRIA_MODEL / ATRIA_API_KEY | 知识问答、对比分析与解释题评阅 |
 | GOOGLE_GEMINI_BASE_URL / GEMINI_MODEL / GEMINI_API_KEY | 图片识别与馆藏资料翻译 |
 | TRIPOSR_RESOLUTION | 网格提取分辨率，默认 128 |
+| QJQN_DEVICE | `auto` 优先 CUDA，亦可强制设为 `cuda` 或 `cpu` |
+| QJQN_RECONSTRUCTION_ENGINE | `auto` 优先 SF3D、失败时使用 TripoSR；也可指定一种 |
+| SF3D_BAKE_RESOLUTION | SF3D 纹理烘焙分辨率，8GB 显存建议 1024 |
 | QJQN_DB_PATH | 可选 SQLite 路径，默认 backend/data/app.sqlite3 |
 
-首次重建下载官方 TripoSR、DINO 编码器与 U2NetP 权重，缓存保存在 `backend/cache`。TripoSR 源码由安装脚本获取，Windows CPU 等值面提取使用 scikit-image。
+推荐使用 SF3D 作为 GPU 主引擎，TripoSR 作为低显存兜底。SF3D 权重需要先在 Hugging Face 接受 `stabilityai/stable-fast-3d` 的许可并登录；两种引擎权重均缓存于 `backend/cache`。推理优先使用 CUDA；Windows 等值面提取使用 scikit-image 以避免本地编译扩展。
 
 ## 已接入功能
 

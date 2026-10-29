@@ -1,4 +1,4 @@
-"""TripoSR 单图三维重建引擎（CPU 推理）。
+"""TripoSR 单图三维重建引擎（优先 CUDA，缺失时回退 CPU）。
 
 基于 VAST-AI-Research/TripoSR 开源模型（stabilityai/TripoSR 权重）。
 仅做真实推理，不伪造结果；模型不可用时抛出明确异常。
@@ -18,18 +18,22 @@ sys.path.insert(0, config.TRIPOSR_DIR)
 
 _lock = threading.Lock()
 _model = None
+_device = None
 torch.set_num_threads(min(8,os.cpu_count() or 1))
 
 
-def _is_available() -> tuple[bool, str]:
-    if not torch.cuda.is_available():
-        return True, "cpu"
-    return True, "cuda"
+def selected_device() -> str:
+    requested = os.environ.get("QJQN_DEVICE", "auto").lower()
+    if requested not in {"auto", "cpu", "cuda"}:
+        raise RuntimeError("QJQN_DEVICE 只能是 auto、cpu 或 cuda")
+    if requested == "cuda" and not torch.cuda.is_available():
+        raise RuntimeError("已要求使用 CUDA，但 PyTorch 未检测到可用 NVIDIA GPU")
+    return "cuda" if requested == "cuda" or (requested == "auto" and torch.cuda.is_available()) else "cpu"
 
 
 def get_model():
     """惰性加载 TripoSR 模型（进程内单例）。"""
-    global _model
+    global _model, _device
     with _lock:
         if _model is not None:
             return _model
@@ -42,13 +46,13 @@ def get_model():
                 f"并安装其依赖。原始错误：{exc}"
             ) from exc
 
-        device = "cpu"
+        device = selected_device()
         model = TSR.from_pretrained(
             config.MODEL_ID,
             config_name=config.CONFIG_NAME,
             weight_name=config.WEIGHT_NAME,
         )
-        # CPU 推理：降低 chunk size，避免显存/内存溢出
+        # 8GB 显存也使用较小分块；只影响速度，不降低网格分辨率。
         try:
             model.renderer.set_chunk_size(8192)
         except Exception:  # noqa: BLE001
@@ -56,6 +60,7 @@ def get_model():
         model.to(device)
         model.eval()
         _model = model
+        _device = device
         return _model
 
 
@@ -76,8 +81,8 @@ def reconstruct(image_bytes: bytes, progress=lambda stage,value: None) -> "objec
     image = Image.fromarray((arr * 255.0).astype(np.uint8))
 
     progress('三维结构推理',55)
-    with torch.no_grad():
-        scene_codes = model([image], device="cpu")
+    with torch.inference_mode():
+        scene_codes = model([image], device=_device)
     progress('提取三维网格',70)
     mesh = model.extract_mesh(scene_codes, True, resolution=config.RESOLUTION)[0]
 
