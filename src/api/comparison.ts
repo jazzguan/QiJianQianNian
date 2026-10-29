@@ -45,3 +45,24 @@ export function fetchComparisonPair(
 ): Promise<ComparisonPair> {
   return post('/compare', selection, signal)
 }
+
+export async function compareUploadedModel(
+  file: File,
+  rightId: string,
+  upAxis: string,
+  signal?: AbortSignal,
+): Promise<ComparisonPair> {
+  const body = new FormData()
+  body.append('file', file)
+  body.append('rightId', rightId)
+  body.append('upAxis', upAxis)
+  body.append('label', file.name.replace(/\.glb$/i, ''))
+  const response = await fetch(`${BASE}/api/compare/upload`, {
+    method: 'POST', body, signal, credentials: 'include',
+  })
+  if (!response.ok) {
+    const error = await response.json().catch(() => null)
+    throw new Error(typeof error?.detail === 'string' ? error.detail : `GLB 对比失败（${response.status}）`)
+  }
+  return response.json() as Promise<ComparisonPair>
+}

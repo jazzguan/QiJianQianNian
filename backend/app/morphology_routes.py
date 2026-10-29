@@ -1,16 +1,17 @@
 """历史轮廓和本服务生成 GLB 的测量与对比 API。"""
+import io
 import json
 import re
 from pathlib import Path
 from urllib.parse import urlparse
 
 import trimesh
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from pydantic import BaseModel
 
 from . import config
 from . import storage
-from .morphology import compare_measurements, measure_mesh, measure_profile
+from .morphology import compare_measurements, measure_mesh, measure_profile, normalize_mesh
 
 router = APIRouter(prefix="/api", tags=["形态对比"])
 
@@ -69,6 +70,19 @@ def measure(artifact_id=None, model_url=None):
         raise HTTPException(422, f"形态测量失败：{exc}") from exc
 
 
+def uploaded_measurement(data: bytes, up_axis: str):
+    if len(data) > 20 * 1024 * 1024:
+        raise HTTPException(413, "GLB 文件不能超过 20MB")
+    if len(data) < 20 or data[:4] != b"glTF" or int.from_bytes(data[8:12], "little") != len(data):
+        raise HTTPException(422, "请上传有效且自包含的 GLB 文件")
+    try:
+        scene = trimesh.load(io.BytesIO(data), file_type="glb", force="scene", process=False)
+        mesh = scene.to_geometry() if isinstance(scene, trimesh.Scene) else scene
+        return measure_mesh(normalize_mesh(mesh, up_axis))
+    except (ValueError, TypeError, IndexError, json.JSONDecodeError) as exc:
+        raise HTTPException(422, f"GLB 形态测量失败：{exc}") from None
+
+
 @router.post("/measure")
 def api_measure(payload: MeasureRequest,request: Request):
     if bool(payload.modelUrl) == bool(payload.artifactId):
@@ -93,6 +107,30 @@ def api_compare(payload: CompareRequest,request: Request):
     result['sources'] = left_item.get('sources',[])+right_item.get('sources',[])
     return {"id": f"{payload.leftId}-vs-{payload.rightId}",
             "leftId": payload.leftId, "rightId": payload.rightId, **result}
+
+
+@router.post("/compare/upload")
+async def compare_uploaded_model(
+    rightId: str = Form(...),
+    upAxis: str = Form("y"),
+    label: str = Form("导入模型"),
+    file: UploadFile = File(...),
+):
+    """直接比较上传 GLB 与馆藏器物；文件仅在内存中处理，不写入服务器。"""
+    data = await file.read(20 * 1024 * 1024 + 1)
+    left = uploaded_measurement(data, upAxis)
+    right = measure(rightId)
+    right_item = catalog().get(rightId)
+    if right_item is None:
+        raise HTTPException(404, "参考器物不存在")
+    left_label = (label.strip() or "导入模型")[:80]
+    result = compare_measurements(left, right, left_label, right_item["name"])
+    result["featureRows"] = [
+        {"label": title, "left": "导入模型暂无馆藏记录", "right": right_item.get(key, "")}
+        for title, key in [("所属时期", "period"), ("制作工艺", "summary"), ("文化与年代", "history")]
+    ]
+    result["sources"] = right_item.get("sources", [])
+    return {"id": f"upload-vs-{rightId}", "leftId": "uploaded-glb", "rightId": rightId, **result}
 
 
 @router.post('/compare/explain')

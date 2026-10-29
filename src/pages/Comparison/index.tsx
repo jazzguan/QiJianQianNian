@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { CompareViewer } from '../../components/CompareViewer'
 import { EvolutionModeSwitch } from '../../components/EvolutionModeSwitch'
-import { fetchComparisonPair } from '../../api/comparison'
+import { compareUploadedModel, fetchComparisonPair } from '../../api/comparison'
 import { useSearchParams } from 'react-router-dom'
 import { useCatalog, useAuth, track } from '../../stores/Platform'
 import Sources from '../../components/Sources'
@@ -61,13 +61,37 @@ function measuredPorcelain(
   return { ...porcelain, shape: measurement.shape, params: measurement }
 }
 
+function ProfileChart({ left, right }: { left: MorphologyMeasurement; right: MorphologyMeasurement }) {
+  const path = (shape: Array<[number, number]>, mirror = false) => shape.map(([r, y], i) =>
+    `${i ? 'L' : 'M'} ${150 + (mirror ? -r : r) * 5} ${170 - y * 5}`).join(' ')
+  return <div className="panel p-5">
+    <span className="eyebrow">截面轮廓叠加</span>
+    <svg viewBox="0 0 300 180" className="mt-3 h-56 w-full" role="img" aria-label="左右器物截面轮廓叠加图">
+      <path d={path(left.shape, true)} fill="none" stroke="#9b6b2f" strokeWidth="2" />
+      <path d={path(right.shape)} fill="none" stroke="#315b78" strokeWidth="2" />
+      <line x1="150" y1="15" x2="150" y2="172" stroke="currentColor" opacity=".2" />
+    </svg>
+    <p className="text-xs text-ink-soft">左侧轮廓向左展开，右侧轮廓向右展开；高度均归一化为 30。</p>
+  </div>
+}
+
+function exportCsv(pair: ComparisonPair) {
+  const escape = (value: string) => `"${value.replaceAll('"', '""')}"`
+  const csv = ['参数,左侧,右侧', ...pair.rows.map((row) => [row.label, row.left, row.right].map(escape).join(','))].join('\r\n')
+  const url = URL.createObjectURL(new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' }))
+  const link = document.createElement('a'); link.href = url; link.download = '器见千年-形态对比.csv'; link.click()
+  URL.revokeObjectURL(url)
+}
+
 export default function Comparison() {
   const { items: porcelains, error: catalogError } = useCatalog()
   const { user } = useAuth()
   const [params] = useSearchParams()
   const getPorcelainById = (id: string) => porcelains.find((x) => x.id === id)!
   const { current, clearCurrent } = usePorcelainModel()
-  const personalized = !!current?.porcelain && !params.get('left')
+  const [uploaded, setUploaded] = useState<{ file: File; url: string } | null>(null)
+  const [upAxis, setUpAxis] = useState('y')
+  const personalized = !!current?.porcelain && !params.get('left') && !uploaded
   const [leftId, setLeftId] = useState(params.get('left') ?? '')
   const [rightId, setRightId] = useState(params.get('right') ?? '')
   useEffect(() => {
@@ -81,7 +105,7 @@ export default function Comparison() {
   const [retry, setRetry] = useState(0)
   const [explanation, setExplanation] = useState<AIQueryAnswer | null>(null),
     [explaining, setExplaining] = useState(false)
-  const selectedLeft = personalized ? current.id : leftId
+  const selectedLeft = uploaded ? 'uploaded-glb' : personalized ? current.id : leftId
   const modelUrl = personalized ? current.modelUrl : null
 
   useEffect(() => {
@@ -94,10 +118,13 @@ export default function Comparison() {
       setError('当前瓷器没有重建模型，请先在三维复原页面生成模型。')
       return () => controller.abort()
     }
-    fetchComparisonPair(
-      { leftId: selectedLeft, rightId, leftModelUrl: modelUrl ?? undefined },
-      controller.signal,
-    )
+    const comparison = uploaded
+      ? compareUploadedModel(uploaded.file, rightId, upAxis, controller.signal)
+      : fetchComparisonPair(
+          { leftId: selectedLeft, rightId, leftModelUrl: modelUrl ?? undefined },
+          controller.signal,
+        )
+    comparison
       .then((data) => {
         if (!controller.signal.aborted) {
           setPair(data)
@@ -117,14 +144,19 @@ export default function Comparison() {
         }
       })
     return () => controller.abort()
-  }, [selectedLeft, rightId, modelUrl, personalized, retry])
+  }, [selectedLeft, rightId, modelUrl, personalized, retry, uploaded, upAxis])
 
   const activePair =
     pair?.leftId === selectedLeft && pair.rightId === rightId ? pair : null
   const leftMeasurement = activePair?.leftMeasurement
   const rightMeasurement = activePair?.rightMeasurement
-  const left =
-    leftMeasurement && (personalized || getPorcelainById(leftId))
+  const left = uploaded && leftMeasurement
+    ? measuredPorcelain({
+        ...getPorcelainById(rightId), id: 'uploaded-glb', name: uploaded.file.name,
+        dynasty: 'unknown', dynastyName: '导入模型', period: '本地 GLB', modelUrl: uploaded.url,
+        parts: [], formFeatures: [], decorationFeatures: [], craftFeatures: [], history: '',
+      }, leftMeasurement)
+    : leftMeasurement && (personalized || getPorcelainById(leftId))
       ? measuredPorcelain(
           personalized
             ? {
@@ -196,6 +228,22 @@ export default function Comparison() {
           </select>
         </label>
       </div>
+      <div className="panel mt-4 flex flex-wrap items-center gap-4 p-4 text-sm">
+        <label className="text-blue">导入任意 GLB
+          <input className="ml-3 text-xs" type="file" accept=".glb" onChange={(event) => {
+            const file = event.target.files?.[0]
+            if (!file) return
+            if (file.size > 20 * 1024 * 1024) { setError('GLB 文件不能超过 20MB'); return }
+            setUploaded((old) => { if (old) URL.revokeObjectURL(old.url); return { file, url: URL.createObjectURL(file) } })
+          }} />
+        </label>
+        {uploaded && <>
+          <label>竖直轴<select className="ml-2 border border-ink/20 bg-ivory p-1" value={upAxis} onChange={(e) => setUpAxis(e.target.value)}>
+            {['y', 'z', 'x', '-y', '-z', '-x'].map((axis) => <option key={axis}>{axis}</option>)}
+          </select></label>
+          <button className="btn-ghost" onClick={() => setUploaded((old) => { if (old) URL.revokeObjectURL(old.url); return null })}>取消导入</button>
+        </>}
+      </div>
       {error || catalogError ? (
         <div role="alert" className="panel mt-8 p-6 text-sm text-ink-soft">
           <p>{error || catalogError}</p>
@@ -220,6 +268,8 @@ export default function Comparison() {
             leftLabel={left.name}
             rightLabel={right.name}
           />
+          {leftMeasurement && rightMeasurement && <ProfileChart left={leftMeasurement} right={rightMeasurement} />}
+          <button className="btn-ghost self-start" onClick={() => exportCsv(activePair)}>导出参数 CSV</button>
           {activePair.featureRows && (
             <ParamsTable
               rows={activePair.featureRows}
