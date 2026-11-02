@@ -1,64 +1,98 @@
-import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { Timeline } from '../../components/Timeline'
-import { PorcelainViewer } from '../../components/PorcelainViewer'
-import { CompareViewer } from '../../components/CompareViewer'
-import { fetchTimeline } from '../../api/timeline'
-import { request } from '../../api/client'
-import { useCatalog, useAuth, track } from '../../stores/Platform'
-import { usePorcelainModel } from '../../stores/PorcelainModelManager'
-import Sources from '../../components/Sources'
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { Timeline } from "../../components/Timeline";
+import { PorcelainViewer } from "../../components/PorcelainViewer";
+import { CompareViewer } from "../../components/CompareViewer";
+import { fetchTimeline } from "../../api/timeline";
+import { request } from "../../api/client";
+import { useCatalog, useAuth, track } from "../../stores/Platform";
+import { usePorcelainModel } from "../../stores/PorcelainModelManager";
+import Sources from "../../components/Sources";
 import type {
   DynastyId,
   DynastyInfo,
   PersonalizedMatch,
-} from '../../types/porcelain'
+  AIQueryAnswer,
+} from "../../types/porcelain";
 export default function TimelinePage() {
   const { items, error: catalogError } = useCatalog(),
     { current, clearCurrent } = usePorcelainModel(),
-    { user } = useAuth()
+    { user } = useAuth();
   const [dynasties, setDynasties] = useState<DynastyInfo[]>([]),
-    [activeId, setActiveId] = useState<DynastyId>('tang'),
-    [selected, setSelected] = useState(''),
-    [category, setCategory] = useState(''),
+    [activeId, setActiveId] = useState<DynastyId>("tang"),
+    [selected, setSelected] = useState(""),
+    [category, setCategory] = useState(""),
     [matches, setMatches] = useState<PersonalizedMatch[]>([]),
-    [error, setError] = useState('')
-  const uploaded = current?.source === 'uploaded' && current.porcelain
+    [error, setError] = useState("");
+  const uploaded = current?.source === "uploaded" && current.porcelain;
+  const [explanation, setExplanation] = useState<AIQueryAnswer | null>(null);
+  const [explainError, setExplainError] = useState("");
+  const [explaining, setExplaining] = useState(false);
+  const [explainRetry, setExplainRetry] = useState(0);
   useEffect(() => {
     fetchTimeline()
       .then(setDynasties)
-      .catch((e) => setError(e.message))
-  }, [])
+      .catch((e) => setError(e.message));
+  }, []);
   useEffect(() => {
-    if (!uploaded || !current.recognition) return
-    const controller = new AbortController()
-    setMatches([])
-    request<{ matches: PersonalizedMatch[] }>('/evolution/match', {
-      method: 'POST',
+    if (!uploaded || !current.recognition) return;
+    const controller = new AbortController();
+    setMatches([]);
+    request<{ matches: PersonalizedMatch[] }>("/evolution/match", {
+      method: "POST",
       body: JSON.stringify(current.recognition),
       signal: controller.signal,
     })
       .then((r) => setMatches(r.matches))
       .catch((e) => {
-        if (!controller.signal.aborted) setError(e.message)
-      })
-    return () => controller.abort()
-  }, [current?.id])
+        if (!controller.signal.aborted) setError(e.message);
+      });
+    return () => controller.abort();
+  }, [current?.id]);
   const choices = items.filter(
     (x) => x.dynasty === activeId && (!category || x.category === category),
-  )
-  const match = matches.find((x) => x.dynasty === activeId)
+  );
+  const match = matches.find((x) => x.dynasty === activeId);
   const item = uploaded
     ? items.find((x) => x.id === match?.porcelainId)
-    : (choices.find((x) => x.id === selected) ?? choices[0])
-  const index = dynasties.findIndex((d) => d.id === activeId)
-  const previous = items.find(
-    (x) =>
-      x.dynasty === dynasties[index - 1]?.id && x.category === item?.category,
-  )
+    : (choices.find((x) => x.id === selected) ?? choices[0]);
+  const index = dynasties.findIndex((d) => d.id === activeId);
+  const previous = [...dynasties.slice(0, index)]
+    .reverse()
+    .map((d) =>
+      items.find((x) => x.dynasty === d.id && x.category === item?.category),
+    )
+    .find(Boolean);
   useEffect(() => {
-    if (item && user) track(item.id).catch(() => {})
-  }, [item?.id, user?.id])
+    const controller = new AbortController();
+    setExplanation(null);
+    setExplainError("");
+    setExplaining(!!item);
+    if (!item) return () => controller.abort();
+    const timer = setTimeout(() => {
+      request<AIQueryAnswer>("/evolution/explain", {
+        method: "POST",
+        signal: controller.signal,
+        body: JSON.stringify({ artifactId: item.id, previousId: previous?.id }),
+      })
+        .then((answer) => {
+          if (!controller.signal.aborted) setExplanation(answer);
+        })
+        .catch((e) => {
+          if (!controller.signal.aborted) setExplainError(e.message);
+        })
+        .finally(() => {
+          if (!controller.signal.aborted) setExplaining(false);
+        });
+    }, 700);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [item?.id, previous?.id, explainRetry]);
+  useEffect(() => {
+    if (item && user) track(item.id).catch(() => {});
+  }, [item?.id, user?.id]);
   return (
     <div className="mx-auto max-w-6xl px-6 py-12">
       <h1 className="font-display text-3xl">瓷器历史演化</h1>
@@ -68,8 +102,8 @@ export default function TimelinePage() {
       {uploaded && (
         <div className="panel mt-6 flex flex-wrap items-center justify-between gap-3 p-5">
           <p>
-            我的瓷器 · {current.recognition?.category} ·{' '}
-            {current.recognition?.features.join('、')}
+            我的瓷器 · {current.recognition?.category} ·{" "}
+            {current.recognition?.features.join("、")}
           </p>
           <button className="btn-ghost" onClick={clearCurrent}>
             浏览全部馆藏
@@ -91,8 +125,8 @@ export default function TimelinePage() {
             step={1}
             value={index < 0 ? 0 : index}
             onChange={(e) => {
-              setActiveId(dynasties[Number(e.target.value)].id)
-              setSelected('')
+              setActiveId(dynasties[Number(e.target.value)].id);
+              setSelected("");
             }}
             className="mt-6 w-full accent-gold"
           />
@@ -104,8 +138,8 @@ export default function TimelinePage() {
             aria-label="历史器型筛选"
             value={category}
             onChange={(e) => {
-              setCategory(e.target.value)
-              setSelected('')
+              setCategory(e.target.value);
+              setSelected("");
             }}
             className="border border-ink/20 bg-paper p-2"
           >
@@ -116,7 +150,7 @@ export default function TimelinePage() {
           </select>
           <select
             aria-label="选择历史器物"
-            value={item?.id ?? ''}
+            value={item?.id ?? ""}
             onChange={(e) => setSelected(e.target.value)}
             className="border border-ink/20 bg-paper p-2"
           >
@@ -128,6 +162,39 @@ export default function TimelinePage() {
           </select>
         </div>
       )}
+      <details className="panel my-6 p-4 text-sm">
+        <summary className="cursor-pointer">
+          馆藏器型与时期覆盖（{items.length} 件）
+        </summary>
+        <div className="mt-3 overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead>
+              <tr>
+                <th className="p-2">器型</th>
+                {dynasties.map((d) => (
+                  <th key={d.id} className="p-2">
+                    {d.name}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {[...new Set(items.map((x) => x.category))].map((kind) => (
+                <tr key={kind} className="border-t border-ink/5">
+                  <th className="p-2 font-normal">{kind}</th>
+                  {dynasties.map((d) => (
+                    <td key={d.id} className="p-2">
+                      {items.filter(
+                        (x) => x.category === kind && x.dynasty === d.id,
+                      ).length || "暂无"}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </details>
       {(error || catalogError) && (
         <p role="alert" className="my-5">
           {error || catalogError}
@@ -150,7 +217,9 @@ export default function TimelinePage() {
                   shape={item.shape}
                   glaze={item.glaze}
                   modelUrl={item.modelUrl}
-                  photoTexture={!!item.textureProjection}
+                  photoTexture={
+                    item.textureProjection?.coverage === "symmetric-full"
+                  }
                   showControls
                 />
               </div>
@@ -166,25 +235,27 @@ export default function TimelinePage() {
                 className="h-40 w-full object-contain"
               />
               {[
-                ['器型', item.formFeatures],
-                ['纹饰', item.decorationFeatures],
-                ['工艺', item.craftFeatures],
+                ["器型", item.formFeatures],
+                ["纹饰", item.decorationFeatures],
+                ["工艺", item.craftFeatures],
               ].map(([label, features]) => (
                 <p className="text-sm leading-7" key={String(label)}>
                   <strong>{String(label)}：</strong>
-                  {(features as string[]).join('；') || '馆藏资料未记载'}
+                  {(features as string[]).join("；") || "馆藏资料未记载"}
                 </p>
               ))}
               <p className="text-sm leading-7">{item.description}</p>
               <Sources sources={item.sources} />
-              <Link className="text-blue" to={'/library/' + item.id}>
+              <Link className="text-blue" to={"/library/" + item.id}>
                 查看馆藏详情 →
               </Link>
             </div>
           </div>
           {previous && (
             <div className="panel mt-6 space-y-3 p-6">
-              <h3 className="font-display text-xl">相邻时期 · 同器型观察</h3>
+              <h3 className="font-display text-xl">
+                上一可用时期 · 同器型观察
+              </h3>
               <p className="text-sm">
                 {previous.dynastyName}代「{previous.name}」：{previous.summary}
               </p>
@@ -193,18 +264,47 @@ export default function TimelinePage() {
               </p>
               <Link
                 className="btn-ghost"
-                to={'/comparison?left=' + previous.id + '&right=' + item.id}
+                to={"/comparison?left=" + previous.id + "&right=" + item.id}
               >
                 比较形态与馆藏工艺
               </Link>
             </div>
           )}
+          <section className="panel mt-6 space-y-3 p-6" aria-label="AI演化解释">
+            <h3 className="font-display text-xl">
+              {previous ? "同器型 · 跨时期解释" : "当前时期 · AI讲解"}
+            </h3>
+            {explaining && (
+              <p role="status" className="text-sm">
+                正在结合馆藏资料解释形态与工艺…
+              </p>
+            )}
+            {explainError && (
+              <div role="alert" className="text-sm">
+                <p>{explainError}</p>
+                <button
+                  className="btn-ghost mt-3"
+                  onClick={() => setExplainRetry((x) => x + 1)}
+                >
+                  重新生成
+                </button>
+              </div>
+            )}
+            {explanation && (
+              <>
+                <p className="whitespace-pre-line text-sm leading-7">
+                  {explanation.answer}
+                </p>
+                <Sources sources={explanation.sources} />
+              </>
+            )}
+          </section>
         </>
       ) : (
         <p className="panel mt-8 p-12 text-center">
-          {match?.emptyReason ?? '该时期暂无符合条件的器物。'}
+          {match?.emptyReason ?? "该时期暂无符合条件的器物。"}
         </p>
       )}
     </div>
-  )
+  );
 }

@@ -1,17 +1,17 @@
 # 后端契约：当前状态与早期设计
 
-更新：2026-10-14。分支：`zjz`。当前接口见[API 文档](API.md)，已完成与未完成项见[分支状态](branch-status.md)。
+更新：2026-10-15。分支：`zjz`。当前接口见[API 文档](API.md)，已完成与未完成项见[分支状态](branch-status.md)。
 
-第 1、2、4–6 节保留原有数据库、接口和分工设计，第 3 节记录当前形态接口；设计中提出的 Embedding 和向量库尚未实现。当前 SQLite 表结构见[storage.py](../backend/app/storage.py)，当前检索为 TF-IDF + Atria。
+第 1、2、4–6 节保留原有数据库、接口和分工设计，第 3 节记录当前形态接口；Embedding与向量检索现已由BGE中文模型、SQLite持久化和FAISS实现。当前 SQLite 表结构见[storage.py](../backend/app/storage.py)，当前器型匹配结合TF-IDF与语义向量，问答使用BGE / FAISS检索后调用文本模型。
 
 ## 0. 现状总览
 
 | 功能 | 前端 | 后端 / 数据 / AI |
 | --- | --- | --- |
 | 三维重建 | ✅ | ✅ 已实现（TripoSR，见[接口文档](API.md)） |
-| 历史演化 | ✅ | ✅ 20 件馆藏、朝代查询、同器型与特征匹配；数据尚未覆盖所有器型与时期 |
-| 形态对比 | ✅ | ✅ 馆藏轮廓 / 本人重建 GLB 自动测量、对比和 AI 解释；独立分支的导入与导出功能尚未合并 |
-| AI 讲解 | ✅ | ✅ TF-IDF 馆藏检索、Atria 生成与来源；向量库和扩展文献库尚未实现 |
+| 历史演化 | ✅ | ✅ 38件馆藏、同器型匹配、自动解释；罐、碗、盘、杯覆盖五个时期，细分器型仍有缺口 |
+| 形态对比 | ✅ | ✅ 馆藏轮廓 / 本人重建 GLB 自动测量、对比和 AI 解释；双侧GLB导入、轴选择、轮廓叠加与CSV已集成 |
+| AI 讲解 | ✅ | ✅ BGE / FAISS馆藏与工艺资料检索、文本生成和来源；已补充4篇博物馆工艺资料摘要 |
 
 数据请求通过 `src/api/*.ts` 与重建服务封装，共享类型在 `src/types/porcelain.ts`，当前模型通过 `PorcelainModelManager` 跨页面共享。
 
@@ -113,7 +113,7 @@
 
 `MorphologyMeasurement`：高度、最大腹径、口径、足径、高腹径比、腹部位置、归一化轮廓、数据来源与测量方法，类型定义见 `src/types/porcelain.ts`。
 
-后端实现：`backend/app/morphology.py` + `morphology_routes.py`。历史参考通过 `storage.artifacts()` 读取20件真实馆藏的照片轮廓，种子位于 `backend/data/artifacts.json`。上传模式测量本人实际重建 GLB。
+后端实现：`backend/app/morphology.py` + `morphology_routes.py`。历史参考通过 `storage.artifacts()` 读取38件馆藏；照片模型从轮廓测量，官方扫描从实际网格测量，种子位于 `backend/data/artifacts.json`。上传模式测量本人实际重建 GLB。
 
 前端实现：`src/api/comparison.ts` 调用测量服务；`src/pages/Comparison/index.tsx` 提供左右选择、加载 / 错误 / 重试、参数和洞察；`CompareViewer` 展示重建 GLB 与馆藏模型，支持同步视角和部位对齐。
 

@@ -144,6 +144,51 @@ def evolution_match(payload: MatchRequest):
     return {'matches':matches}
 
 
+@router.get('/evolution/coverage')
+def evolution_coverage():
+    items=storage.artifacts()
+    categories=sorted({x.get('category','未知') for x in items})
+    return {'periods':[{'id':pid,'name':name} for pid,name,_ in PERIODS],
+        'rows':[{'category':category,'counts':{pid:sum(x['dynasty']==pid and x.get('category')==category for x in items) for pid,_,_ in PERIODS}} for category in categories],
+        'total':len(items)}
+
+
+class EvolutionExplainRequest(BaseModel):
+    artifactId: str = Field(max_length=100)
+    previousId: str | None = Field(default=None,max_length=100)
+
+
+@router.post('/evolution/explain')
+def evolution_explain(payload:EvolutionExplainRequest):
+    from .knowledge import text_of
+    current=get_artifact(payload.artifactId)
+    previous=get_artifact(payload.previousId) if payload.previousId else None
+    if previous and previous.get('category')!=current.get('category'):
+        raise HTTPException(422,'演化解释需选择相同器型')
+    items=[x for x in [previous,current] if x]
+    context='\n\n'.join(f'[{i+1}] {text_of(x)}\n形态：{json.dumps(measure_profile(x["shape"]),ensure_ascii=False)}' for i,x in enumerate(items))
+    cache_key=hashlib.sha256((provider_status()['textModel']+context).encode()).hexdigest()
+    with storage.connect() as db:
+        db.execute('CREATE TABLE IF NOT EXISTS evolution_explanations(cache_key TEXT PRIMARY KEY,data TEXT NOT NULL)')
+        cached=db.execute('SELECT data FROM evolution_explanations WHERE cache_key=?',(cache_key,)).fetchone()
+    if cached: return {**json.loads(cached['data']),'cached':True}
+    try:
+        answer=text_completion([{'role':'system','content':'直接解释当前器物的形态、纹饰和工艺。提供了前一时期同器型案例时，用两件器物的名称陈述可观察差异。资料记载原因时再解释原因。引用[1]等资料编号，不附加泛化提醒或身份说明，中文250字以内。'},
+            {'role':'user','content':context}])
+    except ProviderError as exc: raise HTTPException(502,str(exc)) from None
+    sources=[dict(x['sources'][0],id=i+1) for i,x in enumerate(items) if x.get('sources')]
+    result={'answer':answer,'sources':sources,'artifactId':current['id'],'previousId':previous['id'] if previous else None}
+    with storage.connect() as db: db.execute('INSERT OR REPLACE INTO evolution_explanations VALUES(?,?)',(cache_key,json.dumps(result,ensure_ascii=False)))
+    return {**result,'cached':False}
+
+
+@router.get('/knowledge/status')
+def knowledge_status():
+    from .semantic import status
+    from .knowledge import knowledge_documents
+    return {**status(),'documents':len(knowledge_documents())}
+
+
 def inspect_image(image_bytes):
     if len(image_bytes)>12*1024*1024: raise HTTPException(413,'图片不能超过12MB')
     try:

@@ -1,6 +1,6 @@
 # 后端运行与 API
 
-后端采用 FastAPI、SQLite、Gemini、Atria 与 TripoSR。安装和启动步骤见项目根目录 README。
+后端采用 FastAPI、SQLite、Gemini、Atria、TripoSR、BGE 与 FAISS。安装和启动步骤见项目根目录 README。
 
 ## 接口
 
@@ -30,7 +30,7 @@
 
 ## 数据
 
-- backend/data/artifacts.json：20 件馆藏及原始元数据、许可、来源和分割轮廓。
+- backend/data/artifacts.json：38 件馆藏及原始元数据、许可、来源和分割轮廓。
 - backend/data/images：压缩后的 CC0 馆藏照片。
 - backend/data/app.sqlite3：账号、会话、收藏、学习事件、答题记录、任务与模型保存状态。
 - backend/outputs：重建图片与模型；文件接口校验账号归属。

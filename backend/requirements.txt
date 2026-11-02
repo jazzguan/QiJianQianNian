@@ -23,3 +23,5 @@ python-multipart
 fast-simplification
 scikit-image
 httpx
+faiss-cpu>=1.9
+DracoPy>=2

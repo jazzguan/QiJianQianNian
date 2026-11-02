@@ -1,38 +1,36 @@
 # zjz 分支：已完成与未完成
 
-更新：2026-10-14。分支：`zjz`。
+更新：2026-10-15。分支：`zjz`。
 
-## 功能状态
+## 当前功能
 
-| 模块 | 已完成 | 未完成或数据缺口 |
+| 模块 | 已完成 | 仍有的数据或技术缺口 |
 | --- | --- | --- |
-| 前端 + 三维重建 | React 三维界面；Gemini 图片识别；U2NetP 前景分割；TripoSR CPU 重建；实际进度、取消、简化网格、保存、恢复、GLB 下载；原照片纹饰贴图和前后镜像 | 多张照片重建、真实背面纹饰恢复；Hunyuan、Meshy、Tripo、TRELLIS 等新重建服务接入 |
-| 历史演化 | 唐、宋、元、明、清时间轴；20 件馆藏；器型筛选；根据上传器型和特征检索同类；多个案例；相邻时期对比入口 | 各器型在每个朝代都有案例的数据覆盖；拖动时间轴时自动生成 AI 演化解释 |
-| 形态对比 | 馆藏之间、本人重建模型与馆藏之间对比；六项参数自动计算；同步旋转缩放；部位对齐；工艺与年代资料对照；带来源的 AI 差异分析 | 独立分支的任意 GLB 导入、竖直轴选择、截面轮廓叠加、CSV 导出尚未合并；厘米尺度校准、内口径、胎壁厚度测量；自动部位语义分割 |
-| AI 讲解 | 整体与部位讲解、自由问答；当前器物上下文；TF-IDF 检索馆藏文本；Atria 生成回答；引用馆藏来源 | Embedding 检索及 FAISS / Chroma / pgvector 向量库；超出当前 20 件馆藏资料的历史与工艺文献库 |
-| 文物库与模型数据 | 20 件克利夫兰艺术博物馆 CC0 馆藏记录和照片，各朝代 4 件；搜索、筛选、尺寸、馆藏编号、来源；全部生成照片轮廓旋转成体 GLB | 官方扫描网格导入；当前 20 件馆藏 GLB 都由照片轮廓建模，背面纹饰采用正面镜像 |
-| 账号与学习 | 注册登录、会话、个人数据隔离、SQLite 持久化；收藏、探索记录、时长与进度；63 道任务；服务端判分、AI 解释题评阅；首页推荐 | — |
+| 形态对比 | 双侧 GLB 导入、六方向竖直轴选择、账号隔离和刷新恢复；同步旋转缩放、五部位对齐；截面轮廓叠加；参数、馆藏特征和来源对照；CSV 导出；真实 AI 差异解释 | 部位定位使用目录标注或高度区间，自动语义分割尚未实现 |
+| 尺度与内壁测量 | 输入实物高度标定厘米尺寸；已有明确高度的馆藏自动使用记录；包含内壁的网格可计算内口径和器口壁厚；无内壁时显示“无内壁数据” | 照片轮廓和实心网格不能提供缺失的内壁；当前壁厚取器口邻近截面，未测全器身壁厚分布 |
+| 三维重建与纹饰 | 原有 Gemini 识别和 TripoSR 单图重建；新增正面、右侧、背面、左侧四视角轮廓重建，各方向投影对应照片纹饰；保存、恢复和 GLB 下载 | 四视角流程要求水平四方向照片；任意角度照片的自动相机位姿估计尚未接入 |
+| 真实扫描与馆藏 | 38 件真实馆藏：36 件照片轮廓模型、2 件 Smithsonian 官方扫描；扫描保留各方向纹饰，按实际 Z 轴转为竖直 Y 轴 | 36 件照片轮廓模型仍采用正面与背面镜像；全部馆藏替换为真实扫描尚未完成 |
+| 历史演化 | 罐、碗、盘、杯均覆盖唐宋元明清；器型与特征匹配；时期覆盖表；选择时期后自动生成带来源的解释；切换取消旧请求；服务端缓存解释 | 梅瓶、长颈瓶等细分器型仍有时期样本缺口 |
+| AI 与知识检索 | BGE-small-zh-v1.5 中文语义向量、SQLite 持久化和 FAISS 检索；器物匹配结合 TF-IDF；38 件馆藏文本与4篇博物馆工艺资料摘要；Atria 文本生成，配额耗尽或服务不可用时接续已有 Gemini | 尚未导入更大规模的历史与考古文献全文 |
+| 账号与学习 | 注册登录、会话、个人数据隔离、收藏、学习事件、时长、进度、任务判分与 AI 评阅；任务随馆藏数据生成 | — |
 
-六项形态参数为高度、最大腹径、口径、足径、高腹径比、最大腹径的相对高度。展示高度统一为 30，测量口径和足径采用外轮廓；馆藏厘米尺寸单独保存在资料字段中。
+六项主要参数仍为高度、最大腹径、口径、足径、高腹径比及最大腹径位置。比例对比统一高度 30，厘米尺寸在单独表格展示。内口径和壁厚为附加测量，不改变六项基础接口字段。
 
-## 与形态对比独立分支的关系
+## 数据来源
 
-`zjz` 集成文物库、重建、演化、问答、账号和学习功能。`codex/morphology-comparison` 从仓库 master 单独实现形态对比，两者尚未合并。
-
-独立分支新增的 GLB 导入、竖直轴选择、轮廓叠加和 CSV 导出不在当前 `zjz` 页面中；独立分支也未包含 `zjz` 的 20 件真实馆藏、云端讲解、账号和学习中心。详见[独立分支状态](https://github.com/jazzguan/QiJianQianNian/blob/codex/morphology-comparison/docs/branch-status.md)。
+- [克利夫兰艺术博物馆 Open Access](https://www.clevelandart.org/open-access)：36 件 CC0 馆藏照片、尺寸与元数据。
+- [Smithsonian 3D API](https://3d-api.si.edu/api-docs/)：2 件国家亚洲艺术博物馆的清代觚式瓶扫描，来源、原始模型与尺寸保存在各自记录。
+- [V&A 青花瓷](https://www.vam.ac.uk/articles/chinese-blue-and-white-ceramics)、[德化白瓷](https://www.vam.ac.uk/articles/blanc-de-chine-white-porcelain-from-china)。
+- [大都会博物馆珐琅专题](https://www.metmuseum.org/exhibitions/embracing-color)、[中国陶瓷演化与交流](https://www.metmuseum.org/it/press-releases/chinese-ceramics-on-great-hall-balcony-2012-exhibitions)。
 
 ## 已有验证记录
 
-- TypeScript 与 Vite 构建通过。
-- `test_photo_surface`、`test_platform`、`test_morphology` 共 20 项后端测试通过。
-- 真实 Gemini 图片识别、Atria 问答、对比解释和解释题评阅通过。
-- CPU 重建生成 13,140 个顶点、26,276 个面；模型下载、保存、恢复和形态测量通过。
-- 正面纹饰、前后镜像、UV 接缝及 GLB 贴图检查通过。
+开发过程中已执行27项后端测试并通过，覆盖原平台、GLB导入与账号隔离、轴转换、厘米标定、内壁测量、语义索引更新、四视角生成和背面照片纹饰。真实云端问答与跨时期解释已返回带引用的内容。官方扫描的方向已按原始模型坐标和馆方高径尺寸校正。
 
-## 源码与运行说明
+## 分支关系与运行
 
-- [完整实现记录](implementation.md)、[运行与安装](../README.md)、[实际 API](API.md)。
-- [重建路由](../backend/app/main.py)、[纹饰投影](../backend/app/photo_surface.py)。
-- [馆藏、演化、账号与学习](../backend/app/platform_routes.py)、[存储](../backend/app/storage.py)。
-- [形态测量](../backend/app/morphology.py)、[形态接口](../backend/app/morphology_routes.py)、[对比页面](../src/pages/Comparison/index.tsx)。
-- [知识检索与生成](../backend/app/knowledge.py)、[讲解页面](../src/pages/AIExplain/index.tsx)。
+独立形态分支的 GLB 导入、轴向选择、轮廓叠加和 CSV 导出已移植到当前 `zjz`，并接入当前账号、真实馆藏和 AI 解释；独立分支本身未合并本次平台扩展。
+
+- [运行与安装](../README.md)、[形态对比方法](morphology-comparison.md)、[实际 API](API.md)。
+- [内壁与尺度测量](../backend/app/morphology.py)、[私人模型接口](../backend/app/morphology_routes.py)。
+- [四视角重建](../backend/app/multiview.py)、[语义索引](../backend/app/semantic.py)、[工艺资料](../backend/data/knowledge.json)。

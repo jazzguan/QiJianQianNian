@@ -1,6 +1,6 @@
 # zjz 分支接口与公共模块
 
-更新：2026-10-14。已完成与未完成项见[分支状态](branch-status.md)。
+更新：2026-10-15。已完成与未完成项见[分支状态](branch-status.md)。
 
 ## 请求方式
 
@@ -20,7 +20,13 @@
 | GET | `/api/timeline`、`/api/timeline/{dynasty}` | 朝代列表、该朝代代表器物 |
 | POST | `/api/recognize` | multipart file 图片识别 |
 | POST | `/api/evolution/match` | 按 category / features 匹配同类馆藏 |
-| POST | `/api/reconstruct` | multipart file 创建重建任务 |
+| POST | `/api/reconstruct` | multipart file 创建单图重建任务 |
+| POST | `/api/reconstruct/multiview` | multipart files，正面、右侧、背面、左侧四张照片 |
+| GET | `/api/comparison/artifacts` | 公开馆藏及当前账号的模型 |
+| POST | `/api/measure/upload` | GLB、upAxis、可选heightCm，登录后导入 |
+| GET | `/api/evolution/coverage` | 按器型与朝代统计数量 |
+| POST | `/api/evolution/explain` | artifactId、可选previousId，生成并缓存演化解释 |
+| GET | `/api/knowledge/status` | 本地语义模型与资料数量 |
 | GET、DELETE | `/api/task/{id}` | 查询任务进度、取消 |
 | GET | `/api/model/{id}`、`/api/models` | 模型信息、本人任务列表 |
 | POST、DELETE | `/api/models/{id}/save` | 保存、取消保存 |
@@ -51,6 +57,6 @@
 
 ## 数据与生成
 
-SQLite 保存馆藏、账号、会话、收藏、学习事件、答题记录及重建任务；GLB 与上传图片保存于 `backend/outputs`。重建使用 TripoSR CPU 推理；知识问答使用 TF-IDF 检索馆藏文本后调用 Atria；图片识别调用配置的 Gemini 服务。
+SQLite 保存馆藏、账号、会话、收藏、学习事件、答题记录及重建任务；GLB 与上传图片保存于 `backend/outputs`。重建使用 TripoSR CPU 推理；知识问答使用 BGE / FAISS 检索馆藏与工艺资料后调用文本模型，Atria 配额耗尽时使用已有 Gemini 接口；图片识别调用配置的 Gemini 服务。
 
 形态单位为归一化单位（高度=30），实际馆藏尺寸独立保存。馆藏模型来自照片轮廓建模，前后纹饰使用正面照片和镜像。具体算法见[形态对比文档](morphology-comparison.md)，完整存储说明见[后端 README](../backend/README.md)。

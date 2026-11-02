@@ -2,6 +2,7 @@
 import base64
 import json
 import os
+import time
 from pathlib import Path
 from urllib import error, request
 
@@ -17,6 +18,7 @@ def load_environment():
 
 
 load_environment()
+_text_fallback_until=0
 
 
 class ProviderError(RuntimeError):
@@ -61,12 +63,21 @@ def parse_object(text):
 
 
 def text_completion(messages, max_tokens=1600):
+    global _text_fallback_until
+    if time.monotonic() < _text_fallback_until and os.environ.get('GEMINI_API_KEY'):
+        return gemini_text_completion(messages,max_tokens)
     key = os.environ.get('ATRIA_API_KEY', '')
     base = os.environ.get('ATRIA_BASE_URL', 'https://api.atria-asi.ai/v1').rstrip('/')
-    result = post_json(f'{base}/chat/completions', {
-        'model': os.environ.get('ATRIA_MODEL', 'Atria-Dawn-Preview'),
-        'messages': messages, 'max_completion_tokens': max_tokens,
-    }, {'Authorization': f'Bearer {key}'}, key)
+    try:
+        result = post_json(f'{base}/chat/completions', {
+            'model': os.environ.get('ATRIA_MODEL', 'Atria-Dawn-Preview'),
+            'messages': messages, 'max_completion_tokens': max_tokens,
+        }, {'Authorization': f'Bearer {key}'}, key)
+    except ProviderError as exc:
+        if os.environ.get('GEMINI_API_KEY') and any(word in str(exc).lower() for word in ['429','quota','503','502','连接失败']):
+            _text_fallback_until=time.monotonic()+300
+            return gemini_text_completion(messages,max_tokens)
+        raise
     try:
         content = result['choices'][0]['message']['content']
         if not isinstance(content, str) or not content.strip():
@@ -74,6 +85,22 @@ def text_completion(messages, max_tokens=1600):
         return content.strip()
     except (KeyError, IndexError, TypeError, ValueError):
         raise ProviderError('文本服务没有返回回答正文') from None
+
+
+def gemini_text_completion(messages,max_tokens=1600):
+    key=os.environ.get('GEMINI_API_KEY','')
+    base=os.environ.get('GOOGLE_GEMINI_BASE_URL','https://generativelanguage.googleapis.com').rstrip('/')
+    model=os.environ.get('GEMINI_MODEL','gemini-3.8-flash')
+    systems='\n'.join(m['content'] for m in messages if m['role']=='system')
+    body={'contents':[{'role':'model' if m['role']=='assistant' else 'user','parts':[{'text':m['content']}]} for m in messages if m['role']!='system'],
+          'generationConfig':{'maxOutputTokens':max(4096,max_tokens+2048)}}
+    if systems: body['systemInstruction']={'parts':[{'text':systems}]}
+    result=post_json(f'{base}/v1beta/models/{model}:generateContent',body,{'x-goog-api-key':key},key)
+    try:
+        content=''.join(p.get('text','') for p in result['candidates'][0]['content']['parts'] if not p.get('thought'))
+        if not content.strip(): raise ValueError()
+        return content.strip()
+    except (KeyError,IndexError,TypeError,ValueError): raise ProviderError('备用文本模型没有返回回答正文') from None
 
 
 def vision_completion(image_bytes, mime_type, prompt):
@@ -96,5 +123,5 @@ def vision_completion(image_bytes, mime_type, prompt):
 def provider_status():
     return {'textConfigured': bool(os.environ.get('ATRIA_API_KEY')),
             'visionConfigured': bool(os.environ.get('GEMINI_API_KEY')),
-            'textModel': os.environ.get('ATRIA_MODEL', 'Atria-Dawn-Preview'),
+            'textModel': os.environ.get('GEMINI_MODEL','gemini-3.8-flash') if time.monotonic() < _text_fallback_until else os.environ.get('ATRIA_MODEL', 'Atria-Dawn-Preview'),
             'visionModel': os.environ.get('GEMINI_MODEL', 'gemini-3.8-flash')}

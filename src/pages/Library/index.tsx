@@ -1,25 +1,27 @@
-import { useMemo, useState } from 'react'
-import { useCatalog } from '../../stores/Platform'
-import ArtifactCard from '../../components/ArtifactCard'
+import { useMemo, useState } from "react";
+import { useCatalog } from "../../stores/Platform";
+import ArtifactCard from "../../components/ArtifactCard";
 export default function Library() {
-  const { items, loading, error, reload } = useCatalog()
-  const [q, setQ] = useState(''),
-    [dynasty, setDynasty] = useState(''),
-    [category, setCategory] = useState('')
+  const { items, loading, error, reload } = useCatalog();
+  const [q, setQ] = useState(""),
+    [dynasty, setDynasty] = useState(""),
+    [category, setCategory] = useState("");
+  const [scansOnly, setScansOnly] = useState(false);
   const filtered = useMemo(
     () =>
       items.filter(
         (x) =>
           (!dynasty || x.dynasty === dynasty) &&
           (!category || x.category === category) &&
+          (!scansOnly || x.geometrySource === "scan") &&
           (!q ||
             [x.name, x.originalName, x.description, x.summary]
-              .join(' ')
+              .join(" ")
               .toLowerCase()
               .includes(q.toLowerCase())),
       ),
-    [items, q, dynasty, category],
-  )
+    [items, q, dynasty, category, scansOnly],
+  );
   return (
     <div className="mx-auto max-w-6xl px-6 py-12">
       <h1 className="font-display text-3xl">文物库</h1>
@@ -42,11 +44,11 @@ export default function Library() {
         >
           <option value="">全部朝代</option>
           {[
-            ['tang', '唐'],
-            ['song', '宋'],
-            ['yuan', '元'],
-            ['ming', '明'],
-            ['qing', '清'],
+            ["tang", "唐"],
+            ["song", "宋"],
+            ["yuan", "元"],
+            ["ming", "明"],
+            ["qing", "清"],
           ].map(([id, name]) => (
             <option key={id} value={id}>
               {name}
@@ -65,6 +67,15 @@ export default function Library() {
           ))}
         </select>
       </div>
+      <label className="mt-4 inline-flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={scansOnly}
+          onChange={(e) => setScansOnly(e.target.checked)}
+        />
+        仅显示官方三维扫描（
+        {items.filter((x) => x.geometrySource === "scan").length} 件）
+      </label>
       {error ? (
         <div role="alert" className="mt-6">
           {error}
@@ -88,5 +99,5 @@ export default function Library() {
         </>
       )}
     </div>
-  )
+  );
 }

@@ -1,0 +1,30 @@
+[
+  {
+    "id": "vam-blue-white",
+    "title": "中国青花瓷：钴料、釉下彩与分水",
+    "institution": "Victoria and Albert Museum",
+    "url": "https://www.vam.ac.uk/articles/chinese-blue-and-white-ceramics",
+    "text": "青花以钴蓝颜料在白色胎体上绘饰，通常施于釉下。元代景德镇改进制瓷配方与烧成技术。康熙时期流行分水，以蓝色浓淡表现类似水墨画的效果。中国青花通过贸易传播，海外制作者使用当地原料仿制中国式样。"
+  },
+  {
+    "id": "vam-dehua",
+    "title": "德化白瓷：青白釉、模制与附加装饰",
+    "institution": "Victoria and Albert Museum",
+    "url": "https://www.vam.ac.uk/articles/blanc-de-chine-white-porcelain-from-china",
+    "text": "德化位于福建。南宋德化青白瓷已进入海外市场；明代以来，白瓷、青花与部分彩瓷是当地主要产品。德化瓷土易于成型。人物瓷塑采用分块模具压制主体，细节和装饰另行塑制后附加。"
+  },
+  {
+    "id": "met-enamel",
+    "title": "中国装饰艺术中的珐琅与釉上彩",
+    "institution": "The Metropolitan Museum of Art",
+    "url": "https://www.metmuseum.org/exhibitions/embracing-color",
+    "text": "大都会艺术博物馆的1300至1900年珐琅专题说明，17世纪晚期至18世纪，欧洲珐琅材料和技术传入清宫，使瓷器、金属、玻璃等媒介上的珐琅色调更加细腻、多样。"
+  },
+  {
+    "id": "met-ceramics-exchange",
+    "title": "中国陶瓷的演化与全球交流",
+    "institution": "The Metropolitan Museum of Art",
+    "url": "https://www.metmuseum.org/it/press-releases/chinese-ceramics-on-great-hall-balcony-2012-exhibitions",
+    "text": "大都会艺术博物馆的中国陶瓷陈列围绕技术、样式和全球影响组织。景德镇成为重要生产中心，透明釉下绘钴蓝的瓷器逐渐占据重要地位。中国与日本的花鸟、动物和叙事纹样也被欧洲陶瓷制作者重新诠释。"
+  }
+]

@@ -42,7 +42,7 @@ def update(task_id, **values):
     storage.save_reconstruction(task_id,task,owner)
 
 
-def _run_task(task_id, image_bytes):
+def _run_task(task_id, image_bytes, views=None):
     global MODEL_LOADED
     started = time.time()
     try:
@@ -50,37 +50,47 @@ def _run_task(task_id, image_bytes):
             update(task_id,stage='器物识别',progress=8)
             recognition = inspect_image(image_bytes)
             update(task_id,recognition=recognition,stage='加载三维模型',progress=20)
-            from .triposr_engine import reconstruct
-            mesh = reconstruct(image_bytes,lambda stage,value: update(task_id,stage=stage,progress=value))
-            MODEL_LOADED = True
+            progress=lambda stage,value: update(task_id,stage=stage,progress=value)
+            if views:
+                from .multiview import reconstruct_views,apply_view_texture
+                mesh,prepared_views=reconstruct_views(views,progress)
+            else:
+                from .triposr_engine import reconstruct
+                mesh = reconstruct(image_bytes,progress)
+            if not views: MODEL_LOADED = True
             update(task_id,stage='网格与纹理处理',progress=82)
-            mesh = normalize_mesh(orient_upright(mesh),config.DISPLAY_HEIGHT)
+            mesh = normalize_mesh(mesh if views else orient_upright(mesh),config.DISPLAY_HEIGHT)
             uncertainty = vertex_uncertainty(mesh)
             heatmap = make_heatmap_mesh(mesh,uncertainty)
             report=build_report(mesh,uncertainty,(time.time()-started)*1000)
             from .photo_surface import PHOTO_SURFACE_VERSION,photo_surface,apply_photo_texture,export_photo_model
-            _,atlas,projection=photo_surface(Image.open(io.BytesIO(image_bytes)))
-            mesh=apply_photo_texture(mesh,atlas)
+            if views:
+                projection={'version':1,'coverage':'multiview','method':'四方向照片纹饰投影','sourceBounds':[]}
+                original_mesh=mesh
+                mesh=apply_view_texture(mesh,prepared_views)
+            else:
+                _,atlas,projection=photo_surface(Image.open(io.BytesIO(image_bytes)))
+                mesh=apply_photo_texture(mesh,atlas)
             export_photo_model(mesh,Path(config.OUTPUT_DIR)/f'{task_id}.glb')
             heatmap.export(str(Path(config.OUTPUT_DIR)/f'{task_id}.heatmap.glb'))
-            low = mesh.simplify_quadric_decimation(face_count=min(18000,len(mesh.faces)))
-            low=apply_photo_texture(low,atlas)
+            low = (original_mesh if views else mesh).simplify_quadric_decimation(face_count=min(18000,len(mesh.faces)))
+            low=apply_view_texture(low,prepared_views) if views else apply_photo_texture(low,atlas)
             export_photo_model(low,Path(config.OUTPUT_DIR)/f'{task_id}.preview.glb')
-            shape = compute_coarse_shape(mesh)
-            from .morphology import measure_profile
-            params = measure_profile(shape)
+            from .morphology import measure_mesh
+            params = measure_mesh(original_mesh if views else mesh)
+            shape = params['shape']
             parts = [{'id':key,'name':name,'yMin':a*30,'yMax':b*30,'formDescription':'','history':'','knowledge':''}
                      for key,name,a,b in [('foot','器足',0,.12),('mouth','器口',.92,1),('neck','器颈',.75,.92),('decoration','纹饰区域',.45,.60),('body','器身',.12,.75)]]
             porcelain = dict(id=task_id,name=recognition['type'],dynasty='unknown',dynastyName='年代未定',period='',
                 category=recognition['category'],summary=recognition['note'],description=recognition['note'],history='',
                 formFeatures=recognition['features'],decorationFeatures=recognition['decorationFeatures'],craftFeatures=[],
-                shape=shape,params=params,parts=parts,sources=[],modelMethod='TripoSR 单图重建 + 前后镜像纹饰',textureProjection=projection,
+                shape=shape,params=params,parts=parts,sources=[],modelMethod='四视角轮廓重建 + 多视角照片纹饰' if views else 'TripoSR 单图重建 + 前后镜像纹饰',textureProjection=projection,
                 imageUrl=f'/files/{task_id}/image.jpg',modelUrl=f'/files/{task_id}/mesh.glb?v=photo-{PHOTO_SURFACE_VERSION}',
                 glaze={'color':'#ede5d3','roughness':.38,'metalness':.05,'clearcoat':.5,'decoration':'plain'})
             update(task_id,status='success',stage='完成',progress=100,porcelain=porcelain,shape=shape,
                    report={**report,'elapsedMs':int((time.time()-started)*1000)},textureProjection=projection,
                    modelUrl=f'/files/{task_id}/mesh.glb?v=photo-{PHOTO_SURFACE_VERSION}',previewUrl=f'/files/{task_id}/preview.glb?v=photo-{PHOTO_SURFACE_VERSION}',
-                   heatmapUrl=f'/files/{task_id}/heatmap.glb',note='TripoSR 单图重建 · 浏览网格已简化')
+                   heatmapUrl=f'/files/{task_id}/heatmap.glb',note='四视角轮廓重建 · 各方向使用对应照片纹饰' if views else 'TripoSR 单图重建 · 浏览网格已简化')
     except Exception as exc:
         task = storage.reconstruction(task_id)
         if task and task['status'] != 'cancelled': update(task_id,status='error',error=str(exc)[:600],stage='失败')
@@ -119,6 +129,32 @@ async def reconstruct(file: UploadFile=File(...),user=Depends(require_user)):
     storage.save_reconstruction(task_id,dict(taskId=task_id,status='processing',stage='等待处理',progress=0,created=time.time()),user['id'])
     threading.Thread(target=_run_task,args=(task_id,output.getvalue()),daemon=True).start()
     return {'taskId':task_id,'status':'processing'}
+
+
+@app.post('/api/reconstruct/multiview')
+async def reconstruct_multiview(files:list[UploadFile]=File(...),user=Depends(require_user)):
+    if len(files)!=4: raise HTTPException(422,'请依次提供正面、右侧、背面、左侧四张照片')
+    with storage.connect() as db:
+        tasks=[json.loads(r[0]) for r in db.execute('SELECT data FROM reconstructions WHERE owner_id=?',(user['id'],))]
+    if any(x['status']=='processing' for x in tasks): raise HTTPException(409,'已有重建任务进行中')
+    images=[]
+    for file in files:
+        raw=await file.read(12*1024*1024+1)
+        if len(raw)>12*1024*1024: raise HTTPException(413,'每张图片不能超过12MB')
+        try:
+            image=Image.open(io.BytesIO(raw))
+            if image.width*image.height>25_000_000: raise HTTPException(413,'图片像素过大')
+            image=image.convert('RGBA');image.thumbnail((1600,1600))
+            output=io.BytesIO();image.save(output,format='PNG');images.append(output.getvalue())
+        except (UnidentifiedImageError,OSError,Image.DecompressionBombError): raise HTTPException(422,'无法读取图片') from None
+    identifier=str(uuid.uuid4())
+    image=Image.open(io.BytesIO(images[0])); front=Image.new('RGB',image.size,'white');front.paste(image,mask=image.getchannel('A'))
+    output=io.BytesIO();front.save(output,format='JPEG',quality=90)
+    Path(config.OUTPUT_DIR,f'{identifier}.jpg').write_bytes(output.getvalue())
+    for index,data in enumerate(images): Path(config.OUTPUT_DIR,f'{identifier}.view{index}.png').write_bytes(data)
+    storage.save_reconstruction(identifier,dict(taskId=identifier,status='processing',stage='等待多视角处理',progress=0,created=time.time(),kind='multiview'),user['id'])
+    threading.Thread(target=_run_task,args=(identifier,output.getvalue(),images),daemon=True).start()
+    return {'taskId':identifier,'status':'processing'}
 
 
 @app.get('/api/task/{task_id}')
