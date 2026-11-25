@@ -1,8 +1,11 @@
 """运行：python -m unittest test_morphology -v（backend 目录）。"""
+import os
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
+
+os.environ['QJQN_PRELOAD_MODELS']='false'
 
 import numpy as np
 import trimesh

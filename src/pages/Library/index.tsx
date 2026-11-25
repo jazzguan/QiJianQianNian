@@ -1,11 +1,11 @@
-import { useMemo, useState } from 'react'
-import { useCatalog } from '../../stores/Platform'
-import ArtifactCard from '../../components/ArtifactCard'
+import { useMemo, useState } from "react";
+import { useCatalog } from "../../stores/Platform";
+import ArtifactCard from "../../components/ArtifactCard";
 export default function Library() {
-  const { items, loading, error, reload } = useCatalog()
-  const [q, setQ] = useState(''),
-    [dynasty, setDynasty] = useState(''),
-    [category, setCategory] = useState('')
+  const { items, loading, error, reload } = useCatalog();
+  const [q, setQ] = useState(""),
+    [dynasty, setDynasty] = useState(""),
+    [category, setCategory] = useState("");
   const filtered = useMemo(
     () =>
       items.filter(
@@ -14,39 +14,39 @@ export default function Library() {
           (!category || x.category === category) &&
           (!q ||
             [x.name, x.originalName, x.description, x.summary]
-              .join(' ')
+              .join(" ")
               .toLowerCase()
               .includes(q.toLowerCase())),
       ),
     [items, q, dynasty, category],
-  )
+  );
   return (
-    <div className="mx-auto max-w-6xl px-6 py-12">
+    <div className="page-shell">
       <h1 className="font-display text-3xl">文物库</h1>
       <p className="mt-2 text-sm text-ink-soft">
         从馆藏照片、三维形态和馆方资料认识器物。
       </p>
-      <div className="panel mt-8 grid gap-4 p-5 sm:grid-cols-3">
+      <div className="panel mt-5 grid gap-2.5 p-3 sm:mt-8 sm:grid-cols-3 sm:gap-4 sm:p-5">
         <input
           aria-label="搜索文物"
           placeholder="搜索名称、纹饰或工艺"
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          className="border border-ink/20 bg-ivory p-2"
+          className="field"
         />
         <select
           aria-label="朝代筛选"
           value={dynasty}
           onChange={(e) => setDynasty(e.target.value)}
-          className="border border-ink/20 bg-ivory p-2"
+          className="field"
         >
           <option value="">全部朝代</option>
           {[
-            ['tang', '唐'],
-            ['song', '宋'],
-            ['yuan', '元'],
-            ['ming', '明'],
-            ['qing', '清'],
+            ["tang", "唐"],
+            ["song", "宋"],
+            ["yuan", "元"],
+            ["ming", "明"],
+            ["qing", "清"],
           ].map(([id, name]) => (
             <option key={id} value={id}>
               {name}
@@ -57,7 +57,7 @@ export default function Library() {
           aria-label="器型筛选"
           value={category}
           onChange={(e) => setCategory(e.target.value)}
-          className="border border-ink/20 bg-ivory p-2"
+          className="field"
         >
           <option value="">全部器型</option>
           {[...new Set(items.map((x) => x.category))].map((c) => (
@@ -76,8 +76,8 @@ export default function Library() {
         <p className="mt-8">正在加载馆藏…</p>
       ) : (
         <>
-          <p className="my-5 text-sm text-ink-soft">共 {filtered.length} 件</p>
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          <p className="my-4 text-sm text-ink-soft">共 {filtered.length} 件</p>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-5 lg:grid-cols-4">
             {filtered.map((x) => (
               <ArtifactCard key={x.id} item={x} />
             ))}
@@ -88,5 +88,5 @@ export default function Library() {
         </>
       )}
     </div>
-  )
+  );
 }

@@ -13,7 +13,7 @@
 | GET | /api/timeline | 时间轴 |
 | POST | /api/recognize | multipart file 图片识别 |
 | POST | /api/evolution/match | 器型与特征匹配 |
-| POST | /api/reconstruct | 登录后上传并创建任务 |
+| POST | /api/reconstruct | 登录后上传并创建任务；视觉识别不可用时仍继续本地重建 |
 | GET、DELETE | /api/task/{id} | 实际进度、取消 |
 | GET | /api/model/{id}、/api/models | 单个模型、本人历史任务 |
 | POST、DELETE | /api/models/{id}/save | 保存或取消保存 |
@@ -28,6 +28,10 @@
 
 完整字段定义可在服务启动后访问 /docs 。
 
+`/api/recognize` 是独立的云端视觉识别接口，需要 Gemini 配置；`/api/reconstruct` 仅把视觉识别作为可选增强，不以云端密钥作为本地 TripoSR 重建的前置条件。
+
+服务默认在启动后通过后台线程预热三维模型，不阻塞文物库等普通请求。`/health` 的 `triposrModel` 字段提供 `idle/loading/ready/error` 状态、当前阶段和设备信息；重建任务也会显示等待预热、图像分割、结构推理和网格提取阶段。设置 `QJQN_PRELOAD_MODELS=false` 可关闭启动预热。
+
 ## 数据
 
 - backend/data/artifacts.json：20 件馆藏及原始元数据、许可、来源和分割轮廓。
@@ -40,7 +44,7 @@
 
 ## 模型与形态
 
-TripoSR 默认自动选择 CUDA，未检测到兼容 GPU 时回退 CPU；默认等值面分辨率128。完整网格用于几何测量，浏览版本简化至最多18,000面；两个版本均嵌入原照片的正面纹饰贴图。三维展示统一高度30；实际馆藏尺寸保留在measurementsText。
+TripoSR 默认自动选择 CUDA，未检测到兼容 GPU 时回退 CPU；默认等值面分辨率128。U2NetP 由轻量 ONNX Runtime 会话直接执行并在进程内复用，避免 rembg 默认导入 PyMatting/Numba 带来的长时间初始化。完整网格用于几何测量，浏览版本简化至最多18,000面；两个版本均嵌入原照片的正面纹饰贴图。三维展示统一高度30；实际馆藏尺寸保留在measurementsText。
 
 photo_surface.py将正面照片投影到模型，并关于前后分界平面镜像到背面，按器物高度和水平曲面位置计算UV，保持侧面衔接。GLB采用KHR_materials_unlit，避免照片中已有的明暗被二次照明改变。update_surfaces.py可在本机为已下载的馆藏及已完成的上传模型重新生成纹理，无需再次调用云端服务。
 

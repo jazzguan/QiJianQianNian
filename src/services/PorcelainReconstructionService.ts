@@ -22,20 +22,35 @@ export function asCurrent(model: ModelInfo): CurrentPorcelain {
   }
 }
 export const PorcelainReconstructionService = {
-  async reconstruct(image: File | string): Promise<ReconstructTask> {
+  async reconstruct(
+    image: File | string,
+    engine?: string,
+  ): Promise<ReconstructTask> {
     if (!(image instanceof File)) throw new Error('请选择本地图片')
     const body = new FormData()
     body.append('file', image)
+    if (engine && engine !== 'auto') body.append('engine', engine)
     return request('/reconstruct', { method: 'POST', body })
   },
   getTask(taskId: string): Promise<ReconstructTask> {
     return request('/task/' + taskId)
+  },
+  /** 环绕建档：2～40 张多视角照片，走摄影测量（Meshroom）。 */
+  async reconstructMultiview(files: File[]): Promise<ReconstructTask> {
+    if (files.length < 2) throw new Error('至少需要 2 张照片')
+    if (files.length > 40) throw new Error('最多 40 张照片')
+    const body = new FormData()
+    files.forEach((file) => body.append('files', file))
+    return request('/reconstruct/multiview', { method: 'POST', body })
   },
   async getTaskStatus(taskId: string) {
     return (await this.getTask(taskId)).status
   },
   getModel(taskId: string): Promise<ModelInfo> {
     return request('/model/' + taskId)
+  },
+  deleteModel(taskId: string): Promise<{ ok: boolean; removedFiles: number }> {
+    return request('/models/' + taskId, { method: 'DELETE' })
   },
 }
 export default PorcelainReconstructionService

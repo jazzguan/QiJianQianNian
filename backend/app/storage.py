@@ -75,3 +75,12 @@ def reconstruction(task_id):
     with connect() as db:
         row = db.execute('SELECT * FROM reconstructions WHERE id=?', (task_id,)).fetchone()
     return {'owner_id': row['owner_id'], **json.loads(row['data'])} if row else None
+
+
+def delete_reconstruction(task_id):
+    """删除重建记录及其收藏关联；答题记录(attempts)保留，不随模型删除。"""
+    initialize()
+    with connect() as db:
+        db.execute('DELETE FROM saved_models WHERE task_id=?', (task_id,))
+        cur = db.execute('DELETE FROM reconstructions WHERE id=?', (task_id,))
+        return cur.rowcount

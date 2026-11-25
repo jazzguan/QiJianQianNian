@@ -6,12 +6,13 @@ import {
   useState,
 } from 'react'
 import type { ReactNode } from 'react'
-import { request } from '../api/client'
+import { request, setAccessToken } from '../api/client'
 import type { Porcelain } from '../types/porcelain'
 
 interface User {
   id: string
   username: string
+  accessToken?: string
 }
 const Auth = createContext<{
   user: User | null
@@ -37,16 +38,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     username: string,
     password: string,
   ) {
-    setUser(
-      await request<User>(register ? '/auth/register' : '/auth/login', {
+    const authenticated = await request<User>(
+      register ? '/auth/register' : '/auth/login',
+      {
         method: 'POST',
         body: JSON.stringify({ username, password }),
-      }),
+      },
     )
+    setAccessToken(authenticated.accessToken)
+    setUser(authenticated)
   }
   async function logout() {
-    await request('/auth/logout', { method: 'POST' })
-    setUser(null)
+    try {
+      await request('/auth/logout', { method: 'POST' })
+    } finally {
+      setAccessToken(null)
+      setUser(null)
+    }
   }
   return (
     <Auth.Provider value={{ user, ready, authenticate, logout }}>

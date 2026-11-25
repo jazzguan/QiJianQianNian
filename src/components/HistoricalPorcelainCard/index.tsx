@@ -1,16 +1,16 @@
-import { PorcelainViewer } from '../PorcelainViewer'
-import type { Porcelain } from '../../types/porcelain'
+import { PorcelainViewer } from "../PorcelainViewer";
+import type { Porcelain } from "../../types/porcelain";
 
 interface HistoricalPorcelainCardProps {
-  porcelain: Porcelain
-  tag?: string
-  difference?: string
+  porcelain: Porcelain;
+  tag?: string;
+  difference?: string;
 }
 
 /** 历史参考案例卡片：明确区分于用户上传对象。 */
 export function HistoricalPorcelainCard({
   porcelain,
-  tag = '历史参考案例',
+  tag = "历史参考案例",
   difference,
 }: HistoricalPorcelainCardProps) {
   return (
@@ -27,7 +27,7 @@ export function HistoricalPorcelainCard({
         <span className="text-xs text-ink-soft">{porcelain.period}</span>
       </div>
 
-      <div className="h-[340px] bg-ivory/40">
+      <div className="h-[300px] bg-ivory/40 sm:h-[340px]">
         <PorcelainViewer
           modelUrl={porcelain.modelUrl}
           photoTexture={!!porcelain.textureProjection}
@@ -47,7 +47,7 @@ export function HistoricalPorcelainCard({
         </div>
       )}
     </div>
-  )
+  );
 }
 
-export default HistoricalPorcelainCard
+export default HistoricalPorcelainCard;

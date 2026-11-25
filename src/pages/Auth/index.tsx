@@ -1,22 +1,22 @@
-import { useState } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { useAuth } from '../../stores/Platform'
+import { useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useAuth } from "../../stores/Platform";
 export default function AuthPage() {
   const { user, authenticate, logout } = useAuth(),
     navigate = useNavigate(),
-    [params] = useSearchParams()
+    [params] = useSearchParams();
   const [register, setRegister] = useState(false),
-    [username, setUsername] = useState(''),
-    [password, setPassword] = useState(''),
-    [error, setError] = useState(''),
-    [busy, setBusy] = useState(false)
+    [username, setUsername] = useState(""),
+    [password, setPassword] = useState(""),
+    [error, setError] = useState(""),
+    [busy, setBusy] = useState(false);
   return (
-    <div className="mx-auto max-w-lg px-6 py-16">
+    <div className="mx-auto w-full max-w-lg px-4 py-8 sm:px-6 sm:py-16">
       <h1 className="font-display text-3xl">
-        {user ? '账号' : register ? '创建账号' : '登录'}
+        {user ? "账号" : register ? "创建账号" : "登录"}
       </h1>
       {user ? (
-        <div className="panel mt-8 p-6">
+        <div className="panel mt-6 p-4 sm:mt-8 sm:p-6">
           <p>{user.username}</p>
           <Link to="/learning" className="btn-gold mt-5">
             进入学习中心
@@ -30,23 +30,23 @@ export default function AuthPage() {
         </div>
       ) : (
         <form
-          className="panel mt-8 space-y-5 p-6"
+          className="panel mt-6 space-y-5 p-4 sm:mt-8 sm:p-6"
           onSubmit={async (e) => {
-            e.preventDefault()
-            setBusy(true)
-            setError('')
+            e.preventDefault();
+            setBusy(true);
+            setError("");
             try {
-              await authenticate(register, username, password)
-              const next = params.get('next')
+              await authenticate(register, username, password);
+              const next = params.get("next");
               navigate(
-                next?.startsWith('/') && !next.startsWith('//')
+                next?.startsWith("/") && !next.startsWith("//")
                   ? next
-                  : '/learning',
-              )
+                  : "/learning",
+              );
             } catch (e) {
-              setError((e as Error).message)
+              setError((e as Error).message);
             } finally {
-              setBusy(false)
+              setBusy(false);
             }
           }}
         >
@@ -59,7 +59,7 @@ export default function AuthPage() {
               autoComplete="username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="mt-2 w-full border border-ink/20 bg-ivory p-3"
+              className="field mt-2"
             />
           </label>
           <label className="block text-sm">
@@ -69,27 +69,27 @@ export default function AuthPage() {
               required
               minLength={8}
               maxLength={128}
-              autoComplete={register ? 'new-password' : 'current-password'}
+              autoComplete={register ? "new-password" : "current-password"}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="mt-2 w-full border border-ink/20 bg-ivory p-3"
+              className="field mt-2"
             />
             <span className="mt-1 block text-xs text-ink-soft">
               至少8个字符
             </span>
           </label>
-          <button disabled={busy} className="btn-gold">
-            {busy ? '提交中…' : register ? '注册并登录' : '登录'}
+          <button disabled={busy} className="btn-gold w-full sm:w-auto">
+            {busy ? "提交中…" : register ? "注册并登录" : "登录"}
           </button>
           <button
             type="button"
-            className="btn-ghost ml-3"
+            className="btn-ghost mt-3 w-full sm:ml-3 sm:mt-0 sm:w-auto"
             onClick={() => {
-              setRegister(!register)
-              setError('')
+              setRegister(!register);
+              setError("");
             }}
           >
-            {register ? '已有账号' : '创建账号'}
+            {register ? "已有账号" : "创建账号"}
           </button>
         </form>
       )}
@@ -99,5 +99,5 @@ export default function AuthPage() {
         </p>
       )}
     </div>
-  )
+  );
 }

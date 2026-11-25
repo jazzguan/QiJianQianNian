@@ -24,7 +24,9 @@ PERIODS = [('tang','唐','618 — 907'),('song','宋','960 — 1279'),('yuan','�
 
 def current_user(request: Request):
     storage.initialize()
-    token = request.cookies.get('qjqn_session','')
+    authorization = request.headers.get('authorization','')
+    bearer = authorization[7:].strip() if authorization.lower().startswith('bearer ') else ''
+    token = bearer or request.cookies.get('qjqn_session','')
     with storage.connect() as db:
         row = db.execute('SELECT u.id,u.username FROM users u JOIN sessions s ON s.user_id=u.id WHERE s.token=? AND s.expires>?',
                          (hashlib.sha256(token.encode()).hexdigest(),time.time())).fetchone()
@@ -53,7 +55,7 @@ def set_session(user, response, secure):
         db.execute('DELETE FROM sessions WHERE expires<?',(time.time(),))
         db.execute('INSERT INTO sessions VALUES(?,?,?)',(hashlib.sha256(token.encode()).hexdigest(),user['id'],time.time()+14*86400))
     response.set_cookie('qjqn_session',token,httponly=True,samesite='lax',secure=secure,max_age=14*86400)
-    return user
+    return {**user,'accessToken':token}
 
 
 @router.post('/auth/register')
@@ -85,7 +87,9 @@ def me(user=Depends(current_user)): return {'user':user}
 
 @router.post('/auth/logout')
 def logout(request: Request, response: Response):
-    token = request.cookies.get('qjqn_session','')
+    authorization = request.headers.get('authorization','')
+    bearer = authorization[7:].strip() if authorization.lower().startswith('bearer ') else ''
+    token = bearer or request.cookies.get('qjqn_session','')
     with storage.connect() as db:
         db.execute('DELETE FROM sessions WHERE token=?',(hashlib.sha256(token.encode()).hexdigest(),))
     response.delete_cookie('qjqn_session')

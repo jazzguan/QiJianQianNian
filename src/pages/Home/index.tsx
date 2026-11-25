@@ -1,69 +1,69 @@
-import { Link } from 'react-router-dom'
-import { useEffect, useState } from 'react'
-import { PorcelainViewer } from '../../components/PorcelainViewer'
-import { useCatalog, useAuth } from '../../stores/Platform'
-import { request } from '../../api/client'
-import type { Porcelain } from '../../types/porcelain'
-import ArtifactCard from '../../components/ArtifactCard'
+import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { PorcelainViewer } from "../../components/PorcelainViewer";
+import { useCatalog, useAuth } from "../../stores/Platform";
+import { request } from "../../api/client";
+import type { Porcelain } from "../../types/porcelain";
+import ArtifactCard from "../../components/ArtifactCard";
 
 const features = [
   {
-    no: '01',
-    title: '三维复原',
-    desc: '一张照片，让瓷器“立起来”',
-    to: '/reconstruction',
+    no: "01",
+    title: "三维复原",
+    desc: "一张照片，让瓷器“立起来”",
+    to: "/reconstruction",
   },
   {
-    no: '02',
-    title: '历史演化',
-    desc: '沿着时间轴，看见千年变化',
-    to: '/timeline',
+    no: "02",
+    title: "历史演化",
+    desc: "沿着时间轴，看见千年变化",
+    to: "/timeline",
   },
   {
-    no: '03',
-    title: '形态对比',
-    desc: '把两件瓷器放在一起比较',
-    to: '/comparison',
+    no: "03",
+    title: "形态对比",
+    desc: "把两件瓷器放在一起比较",
+    to: "/comparison",
   },
   {
-    no: '04',
-    title: 'AI讲解',
-    desc: '点击器物，听懂它的故事',
-    to: '/ai-explain',
+    no: "04",
+    title: "AI讲解",
+    desc: "点击器物，听懂它的故事",
+    to: "/ai-explain",
   },
-]
+];
 
 export default function Home() {
-  const { items } = useCatalog()
-  const { user } = useAuth()
+  const { items } = useCatalog();
+  const { user } = useAuth();
   const [recommendation, setRecommendation] = useState<{
-    items: Porcelain[]
-    tasks: { id: string; prompt: string; artifactIds: string[] }[]
-    reason: string
-  } | null>(null)
+    items: Porcelain[];
+    tasks: { id: string; prompt: string; artifactIds: string[] }[];
+    reason: string;
+  } | null>(null);
   useEffect(() => {
-    request<typeof recommendation>('/recommendations')
+    request<typeof recommendation>("/recommendations")
       .then(setRecommendation)
-      .catch(() => setRecommendation(null))
-  }, [user?.id])
-  const hero = items.find((x) => x.dynasty === 'song') ?? items[0]
+      .catch(() => setRecommendation(null));
+  }, [user?.id]);
+  const hero = items.find((x) => x.dynasty === "song") ?? items[0];
   return (
     <div>
       {/* Hero */}
-      <section className="mx-auto grid max-w-6xl grid-cols-1 items-center gap-10 px-6 py-16 lg:grid-cols-2 lg:py-24">
+      <section className="mx-auto grid max-w-6xl grid-cols-1 items-center gap-5 px-4 py-8 sm:gap-8 sm:px-6 sm:py-12 lg:grid-cols-2 lg:gap-10 lg:py-24">
         <div>
           <span className="eyebrow">QIJIAN QIANNIAN · 瓷器数字博物馆</span>
-          <h1 className="mt-4 font-display text-5xl font-semibold leading-tight text-ink">
+          <h1 className="mt-3 font-display text-4xl font-semibold leading-tight text-ink sm:mt-4 sm:text-5xl">
             器见千年
           </h1>
-          <p className="mt-4 font-display text-xl text-ink-soft">
+          <p className="mt-3 font-display text-lg text-ink-soft sm:mt-4 sm:text-xl">
             从一件瓷器，看见千年形制演化
           </p>
           <p className="mt-5 max-w-md text-sm leading-relaxed text-ink-soft">
             将传统二维瓷器图像转化为可交互的三维数字对象，沿历史时间轴观察器型、纹饰与工艺的流变，
             在观察、比较与问答中读懂一件瓷器。
           </p>
-          <div className="mt-8 flex items-center gap-4">
+          <div className="mt-6 grid grid-cols-2 gap-3 sm:mt-8 sm:flex sm:items-center sm:gap-4">
             <Link to="/timeline" className="btn-gold">
               开始探索
             </Link>
@@ -73,7 +73,7 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="h-[420px] lg:h-[480px]">
+        <div className="h-[300px] sm:h-[380px] lg:h-[480px]">
           {hero && (
             <PorcelainViewer
               modelUrl={hero.modelUrl}
@@ -88,28 +88,28 @@ export default function Home() {
       </section>
 
       {/* Features */}
-      <section className="mx-auto max-w-6xl px-6 pb-16">
+      <section className="mx-auto max-w-6xl px-4 pb-10 sm:px-6 sm:pb-16">
         <div className="flex items-center justify-between">
           <h2 className="font-display text-2xl">
-            {recommendation?.reason ?? '馆藏探索'}
+            {recommendation?.reason ?? "馆藏探索"}
           </h2>
-          <Link to="/library" className="text-blue">
+          <Link to="/library" className="shrink-0 pl-3 text-sm text-blue">
             浏览文物库 →
           </Link>
         </div>
-        <div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-5 lg:grid-cols-4">
           {(recommendation?.items ?? items.slice(0, 4)).map((x) => (
             <ArtifactCard key={x.id} item={x} />
           ))}
         </div>
-        <Link to="/learning" className="btn-ghost mt-6">
+        <Link to="/learning" className="btn-ghost mt-5 w-full sm:w-auto">
           完成观察、判断、排序与解释任务
         </Link>
         <div className="mt-5 grid gap-4 sm:grid-cols-3">
           {recommendation?.tasks.map((t) => (
             <Link
               key={t.id}
-              to={'/learning?artifact=' + t.artifactIds[0]}
+              to={"/learning?artifact=" + t.artifactIds[0]}
               className="panel p-4 text-sm leading-6 text-ink-soft"
             >
               {t.prompt} →
@@ -118,26 +118,28 @@ export default function Home() {
         </div>
       </section>
       <section className="border-t border-ink/10 bg-paper">
-        <div className="mx-auto max-w-6xl px-6 py-16">
+        <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-16">
           <div className="flex items-center gap-4">
             <span className="eyebrow">核心功能</span>
             <div className="gold-rule" />
           </div>
-          <div className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+          <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-2 lg:grid-cols-4 lg:gap-5">
             {features.map((f) => (
               <Link
                 key={f.no}
                 to={f.to}
-                className="group panel flex flex-col gap-3 p-6 transition-colors hover:border-gold/40"
+                className="group panel flex flex-col gap-1.5 p-4 transition-all hover:-translate-y-0.5 hover:border-gold/40 sm:gap-2 sm:p-5"
               >
-                <span className="font-display text-3xl text-gold/50 transition-colors group-hover:text-gold">
+                <span className="font-display text-2xl text-gold/55 transition-colors group-hover:text-gold">
                   {f.no}
                 </span>
-                <h3 className="font-display text-lg text-ink">{f.title}</h3>
-                <p className="text-sm leading-relaxed text-ink-soft">
+                <h3 className="font-display text-base text-ink sm:text-lg">
+                  {f.title}
+                </h3>
+                <p className="text-xs leading-relaxed text-ink-soft">
                   {f.desc}
                 </p>
-                <span className="mt-auto text-xs tracking-wider text-gold opacity-0 transition-opacity group-hover:opacity-100">
+                <span className="mt-1 text-xs tracking-wider text-gold opacity-100 transition-opacity lg:opacity-0 lg:group-hover:opacity-100">
                   进入 →
                 </span>
               </Link>
@@ -146,5 +148,5 @@ export default function Home() {
         </div>
       </section>
     </div>
-  )
+  );
 }

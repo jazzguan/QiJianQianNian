@@ -11,7 +11,7 @@ from scipy.ndimage import binary_closing, binary_fill_holes, label
 
 from app.providers import ProviderError, vision_completion
 from app import config
-from rembg import new_session, remove
+from app.foreground import remove_background
 from app.photo_surface import collection_surface
 
 ROOT = Path(__file__).resolve().parent
@@ -19,19 +19,14 @@ DATA = ROOT / 'data'
 MEDIA = DATA / 'images'
 DYNASTIES = [('tang', '唐', 'Tang dynasty'), ('song', '宋', 'Song dynasty'),
              ('yuan', '元', 'Yuan dynasty'), ('ming', '明', 'Ming dynasty'), ('qing', '清', 'Qing dynasty')]
-_segmentation = None
-
-
 def fetch(url):
     return urlopen(Request(url, headers={'User-Agent': 'Mozilla/5.0 QiJianQianNian/1.0'}), timeout=40)
 
 
 def photo_profile(image):
-    global _segmentation
     image = image.convert('RGB')
     image.thumbnail((512, 768))
-    if _segmentation is None: _segmentation = new_session('u2netp')
-    foreground = remove(image,session=_segmentation)
+    foreground = remove_background(image)
     mask = np.asarray(foreground)[:,:,3] > 180
     mask = binary_fill_holes(binary_closing(mask, iterations=2))
     regions, count = label(mask)

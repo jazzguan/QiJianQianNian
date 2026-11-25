@@ -1,25 +1,27 @@
-import { Route, Routes, Outlet } from 'react-router-dom'
-import Navbar from './components/Navbar'
-import { PorcelainModelManagerProvider } from './stores/PorcelainModelManager'
-import Home from './pages/Home'
-import Reconstruction from './pages/Reconstruction'
-import TimelinePage from './pages/Timeline'
-import Comparison from './pages/Comparison'
-import AIExplain from './pages/AIExplain'
-import Library from './pages/Library'
-import Artifact from './pages/Artifact'
-import Auth from './pages/Auth'
-import Learning from './pages/Learning'
-import { AuthProvider, CatalogProvider } from './stores/Platform'
+import { Route, Routes, Outlet } from "react-router-dom";
+import Navbar from "./components/Navbar";
+import { PorcelainModelManagerProvider } from "./stores/PorcelainModelManager";
+import Home from "./pages/Home";
+import Reconstruction from "./pages/Reconstruction";
+import Multiview from "./pages/Multiview";
+import TimelinePage from "./pages/Timeline";
+import Comparison from "./pages/Comparison";
+import EngineCompare from "./pages/EngineCompare";
+import AIExplain from "./pages/AIExplain";
+import Library from "./pages/Library";
+import Artifact from "./pages/Artifact";
+import Auth from "./pages/Auth";
+import Learning from "./pages/Learning";
+import { AuthProvider, CatalogProvider } from "./stores/Platform";
 
 function Layout() {
   return (
     <div className="flex min-h-full flex-col">
       <Navbar />
-      <main className="flex-1">
+      <main className="flex-1 pb-20 lg:pb-0">
         <Outlet />
       </main>
-      <footer className="border-t border-ink/10 py-10 text-center">
+      <footer className="border-t border-ink/10 py-8 text-center lg:py-10">
         <p className="font-display text-sm tracking-[0.3em] text-ink">
           器见千年
         </p>
@@ -28,7 +30,7 @@ function Layout() {
         </p>
       </footer>
     </div>
-  )
+  );
 }
 
 export default function App() {
@@ -40,8 +42,10 @@ export default function App() {
             <Route element={<Layout />}>
               <Route path="/" element={<Home />} />
               <Route path="/reconstruction" element={<Reconstruction />} />
+              <Route path="/multiview" element={<Multiview />} />
               <Route path="/timeline" element={<TimelinePage />} />
               <Route path="/comparison" element={<Comparison />} />
+              <Route path="/engine-compare" element={<EngineCompare />} />
               <Route path="/ai-explain" element={<AIExplain />} />
               <Route path="/library" element={<Library />} />
               <Route path="/library/:id" element={<Artifact />} />
@@ -52,5 +56,5 @@ export default function App() {
         </PorcelainModelManagerProvider>
       </CatalogProvider>
     </AuthProvider>
-  )
+  );
 }

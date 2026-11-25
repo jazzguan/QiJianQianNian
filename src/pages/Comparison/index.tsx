@@ -1,32 +1,35 @@
-import { useEffect, useState } from 'react'
-import { CompareViewer } from '../../components/CompareViewer'
-import { EvolutionModeSwitch } from '../../components/EvolutionModeSwitch'
-import { compareUploadedModel, fetchComparisonPair } from '../../api/comparison'
-import { useSearchParams } from 'react-router-dom'
-import { useCatalog, useAuth, track } from '../../stores/Platform'
-import Sources from '../../components/Sources'
-import { request } from '../../api/client'
-import { usePorcelainModel } from '../../stores/PorcelainModelManager'
+import { useEffect, useState } from "react";
+import { CompareViewer } from "../../components/CompareViewer";
+import { EvolutionModeSwitch } from "../../components/EvolutionModeSwitch";
+import {
+  compareUploadedModel,
+  fetchComparisonPair,
+} from "../../api/comparison";
+import { useSearchParams } from "react-router-dom";
+import { useCatalog, useAuth, track } from "../../stores/Platform";
+import Sources from "../../components/Sources";
+import { request } from "../../api/client";
+import { usePorcelainModel } from "../../stores/PorcelainModelManager";
 import type {
   AIQueryAnswer,
   ComparisonPair,
   ComparisonRow,
   MorphologyMeasurement,
   Porcelain,
-} from '../../types/porcelain'
+} from "../../types/porcelain";
 
 function ParamsTable({
   rows,
   leftLabel,
   rightLabel,
 }: {
-  rows: ComparisonRow[]
-  leftLabel: string
-  rightLabel: string
+  rows: ComparisonRow[];
+  leftLabel: string;
+  rightLabel: string;
 }) {
   return (
     <div className="panel overflow-x-auto">
-      <div className="border-b border-ink/10 px-6 py-4">
+      <div className="border-b border-ink/10 px-4 py-4 sm:px-6">
         <span className="eyebrow">关键参数对比 · 自动提取</span>
         <p className="mt-2 text-xs text-ink-soft">
           高度统一为 30，直径采用相同归一化单位。
@@ -35,102 +38,172 @@ function ParamsTable({
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-ink/10 text-left text-ink-soft">
-            <th className="px-6 py-3 font-medium">参数</th>
-            <th className="px-6 py-3 font-medium">{leftLabel}</th>
-            <th className="px-6 py-3 font-medium">{rightLabel}</th>
+            <th className="whitespace-nowrap px-4 py-3 font-medium sm:px-6">
+              参数
+            </th>
+            <th className="whitespace-nowrap px-4 py-3 font-medium sm:px-6">
+              {leftLabel}
+            </th>
+            <th className="whitespace-nowrap px-4 py-3 font-medium sm:px-6">
+              {rightLabel}
+            </th>
           </tr>
         </thead>
         <tbody>
           {rows.map((row) => (
             <tr key={row.label} className="border-b border-ink/5 last:border-0">
-              <td className="px-6 py-3 text-ink-soft">{row.label}</td>
-              <td className="px-6 py-3 font-display text-ink">{row.left}</td>
-              <td className="px-6 py-3 font-display text-ink">{row.right}</td>
+              <td className="whitespace-nowrap px-4 py-3 text-ink-soft sm:px-6">
+                {row.label}
+              </td>
+              <td className="whitespace-nowrap px-4 py-3 font-display text-ink sm:px-6">
+                {row.left}
+              </td>
+              <td className="whitespace-nowrap px-4 py-3 font-display text-ink sm:px-6">
+                {row.right}
+              </td>
             </tr>
           ))}
         </tbody>
       </table>
     </div>
-  )
+  );
 }
 
 function measuredPorcelain(
   porcelain: Porcelain,
   measurement: MorphologyMeasurement,
 ): Porcelain {
-  return { ...porcelain, shape: measurement.shape, params: measurement }
+  return { ...porcelain, shape: measurement.shape, params: measurement };
 }
 
-function ProfileChart({ left, right }: { left: MorphologyMeasurement; right: MorphologyMeasurement }) {
-  const path = (shape: Array<[number, number]>, mirror = false) => shape.map(([r, y], i) =>
-    `${i ? 'L' : 'M'} ${150 + (mirror ? -r : r) * 5} ${170 - y * 5}`).join(' ')
-  return <div className="panel p-5">
-    <span className="eyebrow">截面轮廓叠加</span>
-    <svg viewBox="0 0 300 180" className="mt-3 h-56 w-full" role="img" aria-label="左右器物截面轮廓叠加图">
-      <path d={path(left.shape, true)} fill="none" stroke="#9b6b2f" strokeWidth="2" />
-      <path d={path(right.shape)} fill="none" stroke="#315b78" strokeWidth="2" />
-      <line x1="150" y1="15" x2="150" y2="172" stroke="currentColor" opacity=".2" />
-    </svg>
-    <p className="text-xs text-ink-soft">左侧轮廓向左展开，右侧轮廓向右展开；高度均归一化为 30。</p>
-  </div>
+function ProfileChart({
+  left,
+  right,
+}: {
+  left: MorphologyMeasurement;
+  right: MorphologyMeasurement;
+}) {
+  const path = (shape: Array<[number, number]>, mirror = false) =>
+    shape
+      .map(
+        ([r, y], i) =>
+          `${i ? "L" : "M"} ${150 + (mirror ? -r : r) * 5} ${170 - y * 5}`,
+      )
+      .join(" ");
+  return (
+    <div className="panel p-5">
+      <span className="eyebrow">截面轮廓叠加</span>
+      <svg
+        viewBox="0 0 300 180"
+        className="mt-3 h-56 w-full"
+        role="img"
+        aria-label="左右器物截面轮廓叠加图"
+      >
+        <path
+          d={path(left.shape, true)}
+          fill="none"
+          stroke="#9b6b2f"
+          strokeWidth="2"
+        />
+        <path
+          d={path(right.shape)}
+          fill="none"
+          stroke="#315b78"
+          strokeWidth="2"
+        />
+        <line
+          x1="150"
+          y1="15"
+          x2="150"
+          y2="172"
+          stroke="currentColor"
+          opacity=".2"
+        />
+      </svg>
+      <p className="text-xs text-ink-soft">
+        左侧轮廓向左展开，右侧轮廓向右展开；高度均归一化为 30。
+      </p>
+    </div>
+  );
 }
 
 function exportCsv(pair: ComparisonPair) {
-  const escape = (value: string) => `"${value.replace(/"/g, '""')}"`
-  const csv = ['参数,左侧,右侧', ...pair.rows.map((row) => [row.label, row.left, row.right].map(escape).join(','))].join('\r\n')
-  const url = URL.createObjectURL(new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' }))
-  const link = document.createElement('a'); link.href = url; link.download = '器见千年-形态对比.csv'; link.click()
-  URL.revokeObjectURL(url)
+  const escape = (value: string) => `"${value.replace(/"/g, '""')}"`;
+  const csv = [
+    "参数,左侧,右侧",
+    ...pair.rows.map((row) =>
+      [row.label, row.left, row.right].map(escape).join(","),
+    ),
+  ].join("\r\n");
+  const url = URL.createObjectURL(
+    new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" }),
+  );
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "器见千年-形态对比.csv";
+  link.click();
+  // 立刻回收在部分浏览器里会让下载中断，晚一拍再释放。
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 export default function Comparison() {
-  const { items: porcelains, error: catalogError } = useCatalog()
-  const { user } = useAuth()
-  const [params] = useSearchParams()
-  const getPorcelainById = (id: string) => porcelains.find((x) => x.id === id)!
-  const { current, clearCurrent } = usePorcelainModel()
-  const [uploaded, setUploaded] = useState<{ file: File; url: string } | null>(null)
-  const [upAxis, setUpAxis] = useState('y')
-  const personalized = !!current?.porcelain && !params.get('left') && !uploaded
-  const [leftId, setLeftId] = useState(params.get('left') ?? '')
-  const [rightId, setRightId] = useState(params.get('right') ?? '')
+  const { items: porcelains, error: catalogError } = useCatalog();
+  const { user } = useAuth();
+  const [params] = useSearchParams();
+  const getPorcelainById = (id: string) => porcelains.find((x) => x.id === id)!;
+  const { current, clearCurrent } = usePorcelainModel();
+  const [uploaded, setUploaded] = useState<{ file: File; url: string } | null>(
+    null,
+  );
+  const [upAxis, setUpAxis] = useState("y");
+  const personalized = !!current?.porcelain && !params.get("left") && !uploaded;
+  const [leftId, setLeftId] = useState(params.get("left") ?? "");
+  const [rightId, setRightId] = useState(params.get("right") ?? "");
   useEffect(() => {
     if (porcelains.length) {
-      if (!leftId) setLeftId(porcelains[0].id)
-      if (!rightId) setRightId((porcelains[1] ?? porcelains[0]).id)
+      if (!leftId) setLeftId(porcelains[0].id);
+      if (!rightId) setRightId((porcelains[1] ?? porcelains[0]).id);
     }
-  }, [porcelains])
-  const [pair, setPair] = useState<ComparisonPair | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [retry, setRetry] = useState(0)
+  }, [porcelains]);
+  const [pair, setPair] = useState<ComparisonPair | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [retry, setRetry] = useState(0);
   const [explanation, setExplanation] = useState<AIQueryAnswer | null>(null),
-    [explaining, setExplaining] = useState(false)
-  const selectedLeft = uploaded ? 'uploaded-glb' : personalized ? current.id : leftId
-  const modelUrl = personalized ? current.modelUrl : null
+    [explaining, setExplaining] = useState(false);
+  const selectedLeft = uploaded
+    ? "uploaded-glb"
+    : personalized
+      ? current.id
+      : leftId;
+  const modelUrl = personalized ? current.modelUrl : null;
 
   useEffect(() => {
-    const controller = new AbortController()
-    setPair(null)
-    setError(null)
-    setExplanation(null)
-    if (!selectedLeft || !rightId) return () => controller.abort()
+    const controller = new AbortController();
+    setPair(null);
+    setError(null);
+    setExplanation(null);
+    if (!selectedLeft || !rightId) return () => controller.abort();
     if (personalized && !modelUrl) {
-      setError('当前瓷器没有重建模型，请先在三维复原页面生成模型。')
-      return () => controller.abort()
+      setError("当前瓷器没有重建模型，请先在三维复原页面生成模型。");
+      return () => controller.abort();
     }
     const comparison = uploaded
       ? compareUploadedModel(uploaded.file, rightId, upAxis, controller.signal)
       : fetchComparisonPair(
-          { leftId: selectedLeft, rightId, leftModelUrl: modelUrl ?? undefined },
+          {
+            leftId: selectedLeft,
+            rightId,
+            leftModelUrl: modelUrl ?? undefined,
+          },
           controller.signal,
-        )
+        );
     comparison
       .then((data) => {
         if (!controller.signal.aborted) {
-          setPair(data)
+          setPair(data);
           if (user) {
-            track(selectedLeft, 'compare').catch(() => {})
-            track(rightId, 'compare').catch(() => {})
+            track(selectedLeft, "compare").catch(() => {});
+            track(rightId, "compare").catch(() => {});
           }
         }
       })
@@ -138,45 +211,58 @@ export default function Comparison() {
         if (!controller.signal.aborted) {
           setError(
             reason instanceof TypeError
-              ? '无法连接形态对比服务，请启动后端后重试。'
+              ? "无法连接形态对比服务，请启动后端后重试。"
               : reason.message,
-          )
+          );
         }
-      })
-    return () => controller.abort()
-  }, [selectedLeft, rightId, modelUrl, personalized, retry, uploaded, upAxis])
+      });
+    return () => controller.abort();
+  }, [selectedLeft, rightId, modelUrl, personalized, retry, uploaded, upAxis]);
 
   const activePair =
-    pair?.leftId === selectedLeft && pair.rightId === rightId ? pair : null
-  const leftMeasurement = activePair?.leftMeasurement
-  const rightMeasurement = activePair?.rightMeasurement
-  const left = uploaded && leftMeasurement
-    ? measuredPorcelain({
-        ...getPorcelainById(rightId), id: 'uploaded-glb', name: uploaded.file.name,
-        dynasty: 'unknown', dynastyName: '导入模型', period: '本地 GLB', modelUrl: uploaded.url,
-        parts: [], formFeatures: [], decorationFeatures: [], craftFeatures: [], history: '',
-      }, leftMeasurement)
-    : leftMeasurement && (personalized || getPorcelainById(leftId))
+    pair?.leftId === selectedLeft && pair.rightId === rightId ? pair : null;
+  const leftMeasurement = activePair?.leftMeasurement;
+  const rightMeasurement = activePair?.rightMeasurement;
+  const left =
+    uploaded && leftMeasurement
       ? measuredPorcelain(
-          personalized
-            ? {
-                ...current.porcelain!,
-                id: current.id,
-                name: current.name,
-                period: '上传重建模型',
-                modelUrl: current.previewUrl ?? modelUrl ?? undefined,
-              }
-            : getPorcelainById(leftId),
+          {
+            ...getPorcelainById(rightId),
+            id: "uploaded-glb",
+            name: uploaded.file.name,
+            dynasty: "unknown",
+            dynastyName: "导入模型",
+            period: "本地 GLB",
+            modelUrl: uploaded.url,
+            parts: [],
+            formFeatures: [],
+            decorationFeatures: [],
+            craftFeatures: [],
+            history: "",
+          },
           leftMeasurement,
         )
-      : null
+      : leftMeasurement && (personalized || getPorcelainById(leftId))
+        ? measuredPorcelain(
+            personalized
+              ? {
+                  ...current.porcelain!,
+                  id: current.id,
+                  name: current.name,
+                  period: "上传重建模型",
+                  modelUrl: current.previewUrl ?? modelUrl ?? undefined,
+                }
+              : getPorcelainById(leftId),
+            leftMeasurement,
+          )
+        : null;
   const right =
     rightMeasurement && getPorcelainById(rightId)
       ? measuredPorcelain(getPorcelainById(rightId), rightMeasurement)
-      : null
+      : null;
 
   return (
-    <div className="mx-auto max-w-6xl px-6 py-12">
+    <div className="page-shell">
       <h1 className="font-display text-3xl font-semibold text-ink">
         跨时期形态对比
       </h1>
@@ -192,7 +278,7 @@ export default function Comparison() {
           />
         </div>
       )}
-      <div className="panel mt-8 grid gap-4 p-5 sm:grid-cols-2">
+      <div className="panel mt-6 grid gap-4 p-4 sm:mt-8 sm:grid-cols-2 sm:p-5">
         <label className="flex flex-col gap-2 text-sm text-ink-soft">
           左侧器物
           {personalized ? (
@@ -200,7 +286,7 @@ export default function Comparison() {
           ) : (
             <select
               aria-label="左侧器物"
-              className="rounded border border-ink/20 bg-ivory p-2 text-ink"
+              className="field"
               value={leftId}
               onChange={(event) => setLeftId(event.target.value)}
             >
@@ -216,7 +302,7 @@ export default function Comparison() {
           右侧历史参考
           <select
             aria-label="右侧历史参考"
-            className="rounded border border-ink/20 bg-ivory p-2 text-ink"
+            className="field"
             value={rightId}
             onChange={(event) => setRightId(event.target.value)}
           >
@@ -229,20 +315,53 @@ export default function Comparison() {
         </label>
       </div>
       <div className="panel mt-4 flex flex-wrap items-center gap-4 p-4 text-sm">
-        <label className="text-blue">导入任意 GLB
-          <input className="ml-3 text-xs" type="file" accept=".glb" onChange={(event) => {
-            const file = event.target.files?.[0]
-            if (!file) return
-            if (file.size > 20 * 1024 * 1024) { setError('GLB 文件不能超过 20MB'); return }
-            setUploaded((old) => { if (old) URL.revokeObjectURL(old.url); return { file, url: URL.createObjectURL(file) } })
-          }} />
+        <label className="text-blue">
+          导入任意 GLB
+          <input
+            className="ml-3 text-xs"
+            type="file"
+            accept=".glb"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (!file) return;
+              if (file.size > 20 * 1024 * 1024) {
+                setError("GLB 文件不能超过 20MB");
+                return;
+              }
+              setUploaded((old) => {
+                if (old) URL.revokeObjectURL(old.url);
+                return { file, url: URL.createObjectURL(file) };
+              });
+            }}
+          />
         </label>
-        {uploaded && <>
-          <label>竖直轴<select className="ml-2 border border-ink/20 bg-ivory p-1" value={upAxis} onChange={(e) => setUpAxis(e.target.value)}>
-            {['y', 'z', 'x', '-y', '-z', '-x'].map((axis) => <option key={axis}>{axis}</option>)}
-          </select></label>
-          <button className="btn-ghost" onClick={() => setUploaded((old) => { if (old) URL.revokeObjectURL(old.url); return null })}>取消导入</button>
-        </>}
+        {uploaded && (
+          <>
+            <label>
+              竖直轴
+              <select
+                className="ml-2 border border-ink/20 bg-ivory p-1"
+                value={upAxis}
+                onChange={(e) => setUpAxis(e.target.value)}
+              >
+                {["y", "z", "x", "-y", "-z", "-x"].map((axis) => (
+                  <option key={axis}>{axis}</option>
+                ))}
+              </select>
+            </label>
+            <button
+              className="btn-ghost"
+              onClick={() =>
+                setUploaded((old) => {
+                  if (old) URL.revokeObjectURL(old.url);
+                  return null;
+                })
+              }
+            >
+              取消导入
+            </button>
+          </>
+        )}
       </div>
       {error || catalogError ? (
         <div role="alert" className="panel mt-8 p-6 text-sm text-ink-soft">
@@ -260,7 +379,7 @@ export default function Comparison() {
           <CompareViewer
             left={left}
             right={right}
-            leftLabel={personalized ? '我的瓷器（上传）' : left.dynastyName}
+            leftLabel={personalized ? "我的瓷器（上传）" : left.dynastyName}
             rightLabel={right.dynastyName}
           />
           <ParamsTable
@@ -268,8 +387,15 @@ export default function Comparison() {
             leftLabel={left.name}
             rightLabel={right.name}
           />
-          {leftMeasurement && rightMeasurement && <ProfileChart left={leftMeasurement} right={rightMeasurement} />}
-          <button className="btn-ghost self-start" onClick={() => exportCsv(activePair)}>导出参数 CSV</button>
+          {leftMeasurement && rightMeasurement && (
+            <ProfileChart left={leftMeasurement} right={rightMeasurement} />
+          )}
+          <button
+            className="btn-ghost self-start"
+            onClick={() => exportCsv(activePair)}
+          >
+            导出参数 CSV
+          </button>
           {activePair.featureRows && (
             <ParamsTable
               rows={activePair.featureRows}
@@ -283,26 +409,26 @@ export default function Comparison() {
               className="btn-gold"
               disabled={explaining}
               onClick={async () => {
-                setExplaining(true)
+                setExplaining(true);
                 try {
                   setExplanation(
-                    await request('/compare/explain', {
-                      method: 'POST',
+                    await request("/compare/explain", {
+                      method: "POST",
                       body: JSON.stringify({
                         leftId: selectedLeft,
                         rightId,
                         leftModelUrl: modelUrl ?? undefined,
                       }),
                     }),
-                  )
+                  );
                 } catch (e) {
-                  setError((e as Error).message)
+                  setError((e as Error).message);
                 } finally {
-                  setExplaining(false)
+                  setExplaining(false);
                 }
               }}
             >
-              {explaining ? '正在检索资料…' : 'AI分析形态、纹饰与工艺差异'}
+              {explaining ? "正在检索资料…" : "AI分析形态、纹饰与工艺差异"}
             </button>
             {explanation && (
               <>
@@ -333,5 +459,5 @@ export default function Comparison() {
         </div>
       )}
     </div>
-  )
+  );
 }

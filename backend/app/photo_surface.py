@@ -1,6 +1,5 @@
 """照片前景轮廓与前后镜像纹饰投影，保持照片颜色和上下方向。"""
 import io
-import threading
 import time
 from pathlib import Path
 
@@ -10,18 +9,13 @@ from PIL import Image
 from scipy.ndimage import binary_closing, binary_fill_holes, label, map_coordinates
 
 from . import config
+from .foreground import remove_background
 
-_session = None
-_session_lock = threading.Lock()
 PHOTO_SURFACE_VERSION = 3
 
 
 def segment_photo(image):
-    global _session
-    from rembg import new_session, remove
-    with _session_lock:
-        if _session is None: _session = new_session('u2netp')
-    alpha = np.asarray(remove(image, session=_session))[:, :, 3]
+    alpha = np.asarray(remove_background(image))[:, :, 3]
     mask = binary_fill_holes(binary_closing(alpha > 180, iterations=2))
     regions, count = label(mask)
     if not count: raise ValueError('照片未提取到器物前景')

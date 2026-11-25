@@ -3,6 +3,7 @@ dist/
 .env
 .env.*
 !.env.example
+!.env.android.example
 backend/data/*.sqlite3*
 backend/data/translations.json
 backend/outputs/
@@ -15,3 +16,10 @@ backend/.venv/
 __pycache__/
 *.pyc
 .npm-cache/
+android/.gradle/
+android/.kotlin/
+android/local.properties
+android/app/build/
+android/app/.cxx/
+benchmark/
+.pytest_cache/

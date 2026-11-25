@@ -7,6 +7,21 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TRIPOSR_DIR = os.path.join(BASE_DIR, "TripoSR")
 SF3D_DIR = os.path.join(BASE_DIR, "SF3D")
 
+# Meshroom 便携版目录（含 meshroom_batch.exe），可用环境变量覆盖
+MESHROOM_DIR = os.environ.get(
+    "MESHROOM_DIR", os.path.join(BASE_DIR, "cache", "Meshroom-2023.3.0")
+)
+MESHROOM_BATCH = os.path.join(MESHROOM_DIR, "meshroom_batch.exe")
+
+# Hunyuan3D-2 代码目录（archive 解压，非 git）与本地权重根目录
+HUNYUAN_DIR = os.path.join(BASE_DIR, "cache", "Hunyuan3D-2-main")
+HUNYUAN_MODEL_ROOT = os.path.join(BASE_DIR, "cache", "hy3dgen")
+HUNYUAN_REPO = "tencent/Hunyuan3D-2mini"
+HUNYUAN_SUBFOLDER = "hunyuan3d-dit-v2-mini"
+# 形状推理参数（8GB 显存实测可跑）
+HUNYUAN_STEPS = int(os.environ.get("HUNYUAN_STEPS", "30"))
+HUNYUAN_OCTREE = int(os.environ.get("HUNYUAN_OCTREE", "256"))
+
 # 生成产物目录
 OUTPUT_DIR = os.path.join(BASE_DIR, "outputs")
 os.makedirs(OUTPUT_DIR, exist_ok=True)

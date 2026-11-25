@@ -1,44 +1,44 @@
-import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
-import { useAuth, useCatalog, track } from '../../stores/Platform'
-import { request } from '../../api/client'
-import PorcelainViewer from '../../components/PorcelainViewer'
-import Sources from '../../components/Sources'
+import { useEffect, useState } from "react";
+import { Link, useParams } from "react-router-dom";
+import { useAuth, useCatalog, track } from "../../stores/Platform";
+import { request } from "../../api/client";
+import PorcelainViewer from "../../components/PorcelainViewer";
+import Sources from "../../components/Sources";
 export default function Artifact() {
   const { id } = useParams(),
     { items, loading, error } = useCatalog(),
     { user } = useAuth(),
-    [part, setPart] = useState(''),
+    [part, setPart] = useState(""),
     [saved, setSaved] = useState(false),
-    [message, setMessage] = useState('')
-  const item = items.find((x) => x.id === id)
+    [message, setMessage] = useState("");
+  const item = items.find((x) => x.id === id);
   useEffect(() => {
-    setSaved(false)
-    setMessage('')
-    if (!id || !user) return
-    let alive = true
-    const start = Date.now()
-    track(id).catch(() => {})
-    request<{ favorites: string[] }>('/learning')
+    setSaved(false);
+    setMessage("");
+    if (!id || !user) return;
+    let alive = true;
+    const start = Date.now();
+    track(id).catch(() => {});
+    request<{ favorites: string[] }>("/learning")
       .then((r) => {
-        if (alive) setSaved(r.favorites.includes(id))
+        if (alive) setSaved(r.favorites.includes(id));
       })
-      .catch(() => {})
+      .catch(() => {});
     return () => {
-      alive = false
+      alive = false;
       track(
         id,
-        'time',
+        "time",
         Math.min(600, Math.floor((Date.now() - start) / 1000)),
-      ).catch(() => {})
-    }
-  }, [id, user?.id])
+      ).catch(() => {});
+    };
+  }, [id, user?.id]);
   if (!item)
     return (
-      <p className="p-12">{error || (loading ? '加载馆藏…' : '文物不存在')}</p>
-    )
+      <p className="p-12">{error || (loading ? "加载馆藏…" : "文物不存在")}</p>
+    );
   return (
-    <div className="mx-auto max-w-6xl px-6 py-12">
+    <div className="page-shell">
       <Link to="/library" className="text-sm text-blue">
         ← 文物库
       </Link>
@@ -51,7 +51,7 @@ export default function Artifact() {
           <img
             src={item.imageUrl}
             alt={item.name}
-            className="panel h-96 w-full object-contain p-4"
+            className="panel h-72 w-full object-contain p-3 sm:h-96 sm:p-4"
           />
           <p className="mt-2 text-xs text-ink-soft">
             馆藏照片 · {item.institution}
@@ -59,7 +59,7 @@ export default function Artifact() {
           <Sources sources={item.sources} />
         </div>
         <div>
-          <div className="panel h-96">
+          <div className="panel h-80 overflow-hidden sm:h-96">
             <PorcelainViewer
               shape={item.shape}
               glaze={item.glaze}
@@ -90,7 +90,7 @@ export default function Artifact() {
           )}
         </div>
       </div>
-      <div className="panel mt-8 space-y-4 p-6">
+      <div className="panel mt-6 space-y-4 p-4 sm:mt-8 sm:p-6">
         <p className="leading-7">{item.description || item.summary}</p>
         <p>工艺：{item.summary}</p>
         <p>文化与年代：{item.history}</p>
@@ -98,14 +98,14 @@ export default function Artifact() {
         <p className="text-xs text-ink-soft">
           馆藏编号：{item.accessionNumber}
         </p>
-        <div className="flex flex-wrap gap-3">
-          <Link to={'/ai-explain?artifact=' + item.id} className="btn-gold">
+        <div className="grid grid-cols-2 gap-3 sm:flex sm:flex-wrap">
+          <Link to={"/ai-explain?artifact=" + item.id} className="btn-gold">
             AI讲解
           </Link>
-          <Link to={'/comparison?left=' + item.id} className="btn-ghost">
+          <Link to={"/comparison?left=" + item.id} className="btn-ghost">
             形态对比
           </Link>
-          <Link to={'/learning?artifact=' + item.id} className="btn-ghost">
+          <Link to={"/learning?artifact=" + item.id} className="btn-ghost">
             相关学习任务
           </Link>
           {user ? (
@@ -113,19 +113,19 @@ export default function Artifact() {
               className="btn-ghost"
               onClick={async () => {
                 try {
-                  await request('/favorites/' + item.id, {
-                    method: saved ? 'DELETE' : 'POST',
-                  })
-                  setSaved(!saved)
+                  await request("/favorites/" + item.id, {
+                    method: saved ? "DELETE" : "POST",
+                  });
+                  setSaved(!saved);
                 } catch (e) {
-                  setMessage((e as Error).message)
+                  setMessage((e as Error).message);
                 }
               }}
             >
-              {saved ? '取消收藏' : '收藏文物'}
+              {saved ? "取消收藏" : "收藏文物"}
             </button>
           ) : (
-            <Link className="btn-ghost" to={'/auth?next=/library/' + item.id}>
+            <Link className="btn-ghost" to={"/auth?next=/library/" + item.id}>
               登录后收藏
             </Link>
           )}
@@ -133,5 +133,5 @@ export default function Artifact() {
         {message && <p role="alert">{message}</p>}
       </div>
     </div>
-  )
+  );
 }

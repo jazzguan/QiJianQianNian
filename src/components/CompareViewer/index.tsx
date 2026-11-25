@@ -1,14 +1,14 @@
-import { useRef, useState } from 'react'
-import type { ReactNode } from 'react'
-import { PorcelainViewer } from '../PorcelainViewer'
-import type { SyncState } from '../PorcelainViewer'
-import type { Porcelain } from '../../types/porcelain'
+import { useEffect, useRef, useState } from "react";
+import type { ReactNode } from "react";
+import { PorcelainViewer } from "../PorcelainViewer";
+import type { SyncState } from "../PorcelainViewer";
+import type { Porcelain } from "../../types/porcelain";
 
 interface CompareViewerProps {
-  left: Porcelain
-  right: Porcelain
-  leftLabel?: string
-  rightLabel?: string
+  left: Porcelain;
+  right: Porcelain;
+  leftLabel?: string;
+  rightLabel?: string;
 }
 
 function ViewerCard({
@@ -16,9 +16,9 @@ function ViewerCard({
   label,
   children,
 }: {
-  porcelain: Porcelain
-  label?: string
-  children: ReactNode
+  porcelain: Porcelain;
+  label?: string;
+  children: ReactNode;
 }) {
   return (
     <div className="panel flex flex-col overflow-hidden">
@@ -31,9 +31,9 @@ function ViewerCard({
         </div>
         <span className="text-xs text-ink-soft">{porcelain.period}</span>
       </div>
-      <div className="h-[380px] bg-ivory/40">{children}</div>
+      <div className="h-[300px] bg-ivory/40 sm:h-[380px]">{children}</div>
     </div>
-  )
+  );
 }
 
 export function CompareViewer({
@@ -42,17 +42,22 @@ export function CompareViewer({
   leftLabel,
   rightLabel,
 }: CompareViewerProps) {
-  const [sync, setSync] = useState(true)
-  const [resetToken, setResetToken] = useState(0)
-  const [selectedPart, setSelectedPart] = useState('')
-  const syncRef = useRef<SyncState | null>(null)
+  const [sync, setSync] = useState(true);
+  const [resetToken, setResetToken] = useState(0);
+  const [selectedPart, setSelectedPart] = useState("");
+  const syncRef = useRef<SyncState | null>(null);
+
+  // 换了对比较的两件器物后，之前点选部位已不存在，清掉免得高亮错位。
+  useEffect(() => {
+    setSelectedPart("");
+  }, [left.id, right.id]);
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-ink-soft">
           拖动任一模型即可旋转 / 缩放，
-          {sync ? '当前为同步交互' : '当前为单独交互'}。
+          {sync ? "当前为同步交互" : "当前为单独交互"}。
         </p>
         <div className="flex gap-2">
           <button
@@ -60,7 +65,7 @@ export function CompareViewer({
             className="btn-ghost !px-3 !py-1.5 !text-xs"
             onClick={() => setSync((v) => !v)}
           >
-            {sync ? '同步旋转：开' : '同步旋转：关'}
+            {sync ? "同步旋转：开" : "同步旋转：关"}
           </button>
           <button
             type="button"
@@ -76,8 +81,8 @@ export function CompareViewer({
           <button
             key={p.id}
             className={
-              'btn-ghost !px-3 !py-1 ' +
-              (selectedPart === p.id ? '!border-gold !text-gold' : '')
+              "btn-ghost !px-3 !py-1 " +
+              (selectedPart === p.id ? "!border-gold !text-gold" : "")
             }
             onClick={() => setSelectedPart(p.id)}
           >
@@ -86,10 +91,10 @@ export function CompareViewer({
         ))}
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-2">
         <ViewerCard porcelain={left} label={leftLabel}>
           <PorcelainViewer
-            key={`left-${left.id}-${left.modelUrl ?? ''}`}
+            key={`left-${left.id}-${left.modelUrl ?? ""}`}
             modelUrl={left.modelUrl}
             photoTexture={!!left.textureProjection}
             shape={left.shape}
@@ -106,7 +111,7 @@ export function CompareViewer({
         </ViewerCard>
         <ViewerCard porcelain={right} label={rightLabel}>
           <PorcelainViewer
-            key={`right-${right.id}-${right.modelUrl ?? ''}`}
+            key={`right-${right.id}-${right.modelUrl ?? ""}`}
             modelUrl={right.modelUrl}
             photoTexture={!!right.textureProjection}
             shape={right.shape}
@@ -123,7 +128,7 @@ export function CompareViewer({
         </ViewerCard>
       </div>
     </div>
-  )
+  );
 }
 
-export default CompareViewer
+export default CompareViewer;

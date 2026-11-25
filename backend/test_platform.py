@@ -1,14 +1,16 @@
 """账号隔离、资料检索和学习记录的集成测试。"""
 import io
 import json
+import os
 import tempfile
 import time
 import unittest
 from pathlib import Path
 from unittest.mock import patch
+os.environ['QJQN_PRELOAD_MODELS']='false'
 from PIL import Image
 from fastapi.testclient import TestClient
-from app.main import app, startup
+from app.main import _recognize_for_reconstruction, app, startup
 from app import storage
 from app.platform_routes import learning_tasks
 from app.providers import parse_object,ProviderError
@@ -36,6 +38,20 @@ class PlatformTests(unittest.TestCase):
             self.assertNotIn('correct-password',password)
             db.execute('UPDATE sessions SET expires=0 WHERE user_id=?',(self.user['id'],))
         self.assertEqual(self.client.get('/api/learning').status_code,401)
+
+    def test_native_bearer_auth_and_scoped_file_ticket(self):
+        native=TestClient(app)
+        token=self.user['accessToken']
+        headers={'Authorization':f'Bearer {token}'}
+        self.assertEqual(native.get('/api/auth/me',headers=headers).json()['user']['id'],self.user['id'])
+        task_id='22222222-2222-4222-8222-222222222222'
+        storage.save_reconstruction(task_id,{'taskId':task_id,'status':'success','created':time.time()},self.user['id'])
+        access=native.get('/api/files/access',params={'path':f'/files/{task_id}/mesh.glb?v=1'},headers=headers)
+        self.assertEqual(access.status_code,200)
+        self.assertIn(f'/files/{task_id}/mesh.glb?ticket=',access.json()['url'])
+        self.assertEqual(self.other.get('/api/files/access',params={'path':f'/files/{task_id}/mesh.glb'}).status_code,404)
+        self.assertEqual(native.post('/api/auth/logout',headers=headers).status_code,200)
+        self.assertIsNone(native.get('/api/auth/me',headers=headers).json()['user'])
 
     def test_library_filters_and_sources(self):
         self.assertGreaterEqual(len(self.items),5)
@@ -105,6 +121,22 @@ class PlatformTests(unittest.TestCase):
             self.assertEqual(response.json()['category'],'碗')
         self.assertEqual(parse_object('```json\n{"category":"罐"}\n```')['category'],'罐')
         with self.assertRaises(ProviderError):parse_object('[]')
+
+    def test_reconstruction_continues_without_vision_provider(self):
+        with patch('app.main.inspect_image',side_effect=ProviderError('模型服务尚未配置密钥')):
+            recognition,warning=_recognize_for_reconstruction(b'valid-image-is-validated-before-worker')
+        self.assertEqual(recognition['category'],'未知')
+        self.assertEqual(recognition['type'],'上传器物')
+        self.assertEqual(recognition['model'],'local-fallback')
+        self.assertIn('本地重建',recognition['note'])
+        self.assertIn('未配置密钥',warning)
+
+    def test_health_exposes_non_blocking_model_preload_state(self):
+        health=self.client.get('/health').json()
+        self.assertTrue(health['ok'])
+        self.assertIn(health['triposrModel']['status'],{'idle','loading','ready','error'})
+        self.assertIn('stage',health['triposrModel'])
+        self.assertIn(health['triposrModel']['device'],{'cpu','cuda'})
 
     def test_explanation_grading_uses_collection_evidence(self):
         task=next(x for x in learning_tasks(True) if x.get('inputType')=='text')

@@ -1,77 +1,77 @@
-import { useCallback, useEffect, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
-import { request } from '../../api/client'
-import { useAuth, useCatalog } from '../../stores/Platform'
-import { usePorcelainModel } from '../../stores/PorcelainModelManager'
-import { asCurrent } from '../../services/PorcelainReconstructionService'
-import type { ModelInfo, Source } from '../../types/porcelain'
-import ArtifactCard from '../../components/ArtifactCard'
-import Sources from '../../components/Sources'
-import CompareViewer from '../../components/CompareViewer'
+import { useCallback, useEffect, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
+import { request } from "../../api/client";
+import { useAuth, useCatalog } from "../../stores/Platform";
+import { usePorcelainModel } from "../../stores/PorcelainModelManager";
+import { asCurrent } from "../../services/PorcelainReconstructionService";
+import type { ModelInfo, Source } from "../../types/porcelain";
+import ArtifactCard from "../../components/ArtifactCard";
+import Sources from "../../components/Sources";
+import CompareViewer from "../../components/CompareViewer";
 interface Summary {
-  exploredIds: string[]
-  favorites: string[]
+  exploredIds: string[];
+  favorites: string[];
   attempts: {
-    task_id: string
-    correct: number
-    feedback: string
-    created: number
-  }[]
-  completedTasks: number
-  totalTasks: number
-  durationSeconds: number
-  progress: number
+    task_id: string;
+    correct: number;
+    feedback: string;
+    created: number;
+  }[];
+  completedTasks: number;
+  totalTasks: number;
+  durationSeconds: number;
+  progress: number;
 }
 interface Task {
-  id: string
-  type: string
-  prompt: string
-  artifactIds: string[]
-  options: string[]
-  inputType?: 'text'
+  id: string;
+  type: string;
+  prompt: string;
+  artifactIds: string[];
+  options: string[];
+  inputType?: "text";
 }
 interface Feedback {
-  correct: boolean
-  correctAnswer: string | string[]
-  feedback: string
-  sources: Source[]
+  correct: boolean;
+  correctAnswer: string | string[];
+  feedback: string;
+  sources: Source[];
 }
 type SavedModel = ModelInfo & {
-  taskId: string
-  status: string
-  stage: string
-  error?: string
-  created: number
-  saved: boolean
-}
+  taskId: string;
+  status: string;
+  stage: string;
+  error?: string;
+  created: number;
+  saved: boolean;
+};
 function Exercise({
   task,
   onComplete,
 }: {
-  task: Task
-  onComplete: () => void
+  task: Task;
+  onComplete: () => void;
 }) {
   const { items } = useCatalog(),
-    [answer, setAnswer] = useState(''),
+    [answer, setAnswer] = useState(""),
     [order, setOrder] = useState(task.artifactIds),
     [feedback, setFeedback] = useState<Feedback | null>(null),
     [busy, setBusy] = useState(false),
-    [error, setError] = useState('')
+    [error, setError] = useState("");
   const objects = task.artifactIds
     .map((id) => items.find((x) => x.id === id))
-    .filter((x): x is NonNullable<typeof x> => !!x)
+    .filter((x): x is NonNullable<typeof x> => !!x);
   return (
-    <div className="panel space-y-4 p-6">
+    <div className="panel space-y-4 p-4 sm:p-6">
       <span className="eyebrow">{task.type}任务</span>
       <h3 className="text-lg">{task.prompt}</h3>
-      {task.type === '观察' && objects.length >= 2 ? (
+      {task.type === "观察" && objects.length >= 2 ? (
         <CompareViewer left={objects[0]} right={objects[1]} />
       ) : (
         <div className="flex flex-wrap gap-4">
           {objects.map((x) => (
             <Link
               key={x.id}
-              to={'/library/' + x.id}
+              to={"/library/" + x.id}
               className="text-center text-sm text-blue"
             >
               <img
@@ -84,12 +84,12 @@ function Exercise({
           ))}
         </div>
       )}
-      {task.type === '排序' ? (
+      {task.type === "排序" ? (
         <ol className="space-y-2">
           {order.map((id, i) => (
             <li
               key={id}
-              className="flex items-center gap-3 border border-ink/10 p-2"
+              className="flex items-center gap-3 rounded-md border border-ink/10 p-2"
             >
               <span className="min-w-0 flex-1">
                 {i + 1}. {items.find((x) => x.id === id)?.name}
@@ -99,9 +99,9 @@ function Exercise({
                 disabled={i === 0 || busy}
                 onClick={() =>
                   setOrder((prev) => {
-                    const n = [...prev]
-                    ;[n[i - 1], n[i]] = [n[i], n[i - 1]]
-                    return n
+                    const n = [...prev];
+                    [n[i - 1], n[i]] = [n[i], n[i - 1]];
+                    return n;
                   })
                 }
               >
@@ -112,9 +112,9 @@ function Exercise({
                 disabled={i === order.length - 1 || busy}
                 onClick={() =>
                   setOrder((prev) => {
-                    const n = [...prev]
-                    ;[n[i], n[i + 1]] = [n[i + 1], n[i]]
-                    return n
+                    const n = [...prev];
+                    [n[i], n[i + 1]] = [n[i + 1], n[i]];
+                    return n;
                   })
                 }
               >
@@ -123,7 +123,7 @@ function Exercise({
             </li>
           ))}
         </ol>
-      ) : task.inputType === 'text' ? (
+      ) : task.inputType === "text" ? (
         <label className="block text-sm">
           写下你的解释
           <textarea
@@ -131,7 +131,7 @@ function Exercise({
             value={answer}
             maxLength={1600}
             onChange={(e) => setAnswer(e.target.value)}
-            className="mt-2 min-h-28 w-full border border-ink/20 bg-ivory p-3"
+            className="field mt-2 min-h-28 resize-y"
             placeholder="根据馆藏资料，描述你理解的工艺与装饰方式。"
           />
         </label>
@@ -139,7 +139,7 @@ function Exercise({
         <fieldset className="space-y-2">
           {task.options.map((option) => (
             <label
-              className="flex cursor-pointer items-start gap-3 border border-ink/10 p-3 text-sm"
+              className="flex cursor-pointer items-start gap-3 rounded-md border border-ink/10 p-3 text-sm transition-colors hover:border-gold/40"
               key={option}
             >
               <input
@@ -148,8 +148,8 @@ function Exercise({
                 value={option}
                 checked={answer === option}
                 onChange={() => {
-                  setAnswer(option)
-                  setFeedback(null)
+                  setAnswer(option);
+                  setFeedback(null);
                 }}
               />
               {option}
@@ -159,90 +159,90 @@ function Exercise({
       )}
       <button
         className="btn-gold"
-        disabled={busy || (task.type !== '排序' && !answer)}
+        disabled={busy || (task.type !== "排序" && !answer)}
         onClick={async () => {
-          setBusy(true)
-          setError('')
+          setBusy(true);
+          setError("");
           try {
             setFeedback(
-              await request('/learning/attempts', {
-                method: 'POST',
+              await request("/learning/attempts", {
+                method: "POST",
                 body: JSON.stringify({
                   taskId: task.id,
-                  answer: task.type === '排序' ? order : answer,
+                  answer: task.type === "排序" ? order : answer,
                 }),
               }),
-            )
-            onComplete()
+            );
+            onComplete();
           } catch (e) {
-            setError((e as Error).message)
+            setError((e as Error).message);
           } finally {
-            setBusy(false)
+            setBusy(false);
           }
         }}
       >
-        {busy ? '提交中…' : '提交答案'}
+        {busy ? "提交中…" : "提交答案"}
       </button>
       {feedback && (
         <div role="status" className="border-l-2 border-gold p-3">
-          <strong>{feedback.correct ? '回答正确' : '再观察一下'}</strong>
+          <strong>{feedback.correct ? "回答正确" : "再观察一下"}</strong>
           <p className="mt-2 text-sm">{feedback.feedback}</p>
           <Sources sources={feedback.sources} />
         </div>
       )}
       {error && <p role="alert">{error}</p>}
     </div>
-  )
+  );
 }
 export default function Learning() {
   const { user, ready } = useAuth(),
     { items } = useCatalog(),
     { setCurrent } = usePorcelainModel(),
-    [params] = useSearchParams()
+    [params] = useSearchParams();
   const [summary, setSummary] = useState<Summary | null>(null),
     [tasks, setTasks] = useState<Task[]>([]),
     [models, setModels] = useState<SavedModel[]>([]),
-    [error, setError] = useState(''),
-    [type, setType] = useState(''),
-    [selected, setSelected] = useState(''),
-    [message, setMessage] = useState('')
+    [error, setError] = useState(""),
+    [type, setType] = useState(""),
+    [selected, setSelected] = useState(""),
+    [message, setMessage] = useState("");
   const refresh = useCallback(() => {
-    if (!user) return
-    request<Summary>('/learning')
+    if (!user) return;
+    request<Summary>("/learning")
       .then(setSummary)
-      .catch((e) => setError(e.message))
-    request<{ items: SavedModel[] }>('/models')
+      .catch((e) => setError(e.message));
+    request<{ items: SavedModel[] }>("/models")
       .then((r) => setModels(r.items))
-      .catch((e) => setError(e.message))
-  }, [user?.id])
+      .catch((e) => setError(e.message));
+  }, [user?.id]);
   useEffect(() => {
-    refresh()
-    request<{ items: Task[] }>('/learning/tasks')
+    refresh();
+    request<{ items: Task[] }>("/learning/tasks")
       .then((r) => setTasks(r.items))
-      .catch((e) => setError(e.message))
-  }, [refresh])
+      .catch((e) => setError(e.message));
+  }, [refresh]);
   const filtered = tasks.filter(
     (t) =>
       (!type || t.type === type) &&
-      (!params.get('artifact') ||
-        t.artifactIds.includes(params.get('artifact')!)),
-  )
-  const active = filtered.find((t) => t.id === selected) ?? filtered[0]
-  if (!ready) return <p className="p-12">加载账号…</p>
+      (!params.get("artifact") ||
+        t.artifactIds.includes(params.get("artifact")!)),
+  );
+  const active = filtered.find((t) => t.id === selected) ?? filtered[0];
+  if (!ready) return <p className="p-12">加载账号…</p>;
   if (!user)
     return (
-      <div className="mx-auto max-w-6xl px-6 py-16">
+      <div className="page-shell">
         <h1 className="font-display text-3xl">学习中心</h1>
         <p className="mt-4 text-ink-soft">
           登录后保存探索记录、收藏文物和学习成绩。
         </p>
-        <Link to="/auth?next=/learning" className="btn-gold mt-6">
+        <Link to="/auth?next=/learning" className="btn-gold mt-6 w-full">
           登录 / 注册
         </Link>
       </div>
-    )
+    );
   return (
-    <div className="mx-auto max-w-6xl px-6 py-12">
+    <div className="page-shell">
       <h1 className="font-display text-3xl">{user.username}的学习中心</h1>
       {error && (
         <p role="alert" className="mt-6">
@@ -254,19 +254,21 @@ export default function Learning() {
       )}
       {summary && (
         <>
-          <div className="mt-8 grid gap-4 sm:grid-cols-4">
+          <div className="mt-6 grid grid-cols-2 gap-3 sm:mt-8 sm:grid-cols-4 sm:gap-4">
             {[
-              ['探索文物', summary.exploredIds.length + ' 件'],
+              ["探索文物", summary.exploredIds.length + " 件"],
               [
-                '已完成任务',
-                summary.completedTasks + ' / ' + summary.totalTasks,
+                "已完成任务",
+                summary.completedTasks + " / " + summary.totalTasks,
               ],
-              ['学习时长', Math.floor(summary.durationSeconds / 60) + ' 分钟'],
-              ['学习进度', summary.progress + '%'],
+              ["学习时长", Math.floor(summary.durationSeconds / 60) + " 分钟"],
+              ["学习进度", summary.progress + "%"],
             ].map(([label, value]) => (
-              <div className="panel p-5" key={label}>
+              <div className="panel p-4 sm:p-5" key={label}>
                 <p className="text-sm text-ink-soft">{label}</p>
-                <p className="mt-3 font-display text-2xl">{value}</p>
+                <p className="mt-2 font-display text-xl sm:mt-3 sm:text-2xl">
+                  {value}
+                </p>
               </div>
             ))}
           </div>
@@ -279,14 +281,14 @@ export default function Learning() {
         </>
       )}
       <h2 className="mt-10 font-display text-2xl">互动学习</h2>
-      <div className="my-5 flex flex-wrap gap-3">
+      <div className="my-5 grid gap-3 sm:flex sm:flex-wrap">
         <select
           aria-label="任务类型"
-          className="border border-ink/20 bg-paper p-2"
+          className="field sm:w-auto"
           value={type}
           onChange={(e) => {
-            setType(e.target.value)
-            setSelected('')
+            setType(e.target.value);
+            setSelected("");
           }}
         >
           <option value="">全部任务</option>
@@ -296,8 +298,8 @@ export default function Learning() {
         </select>
         <select
           aria-label="选择任务"
-          className="max-w-full border border-ink/20 bg-paper p-2"
-          value={active?.id ?? ''}
+          className="field max-w-full sm:w-auto"
+          value={active?.id ?? ""}
           onChange={(e) => setSelected(e.target.value)}
         >
           {filtered.map((t) => (
@@ -307,28 +309,37 @@ export default function Learning() {
           ))}
         </select>
       </div>
-      {active && (
+      {active ? (
         <Exercise key={active.id} task={active} onComplete={refresh} />
+      ) : tasks.length === 0 ? (
+        <p className="mt-4 text-sm text-ink-soft">正在加载学习任务…</p>
+      ) : (
+        <p className="mt-4 text-sm text-ink-soft">
+          当前筛选下没有任务。
+          <Link to="/learning" className="ml-2 text-blue">
+            查看全部
+          </Link>
+        </p>
       )}
       <h2 className="mt-10 font-display text-2xl">我的模型</h2>
       <div className="mt-5 grid gap-4 md:grid-cols-2">
         {models.map((m) => (
           <div className="panel p-5" key={m.taskId}>
             <p>
-              {m.porcelain?.name ?? '重建任务'} ·{' '}
-              {m.status === 'success' ? '完成' : m.stage}
+              {m.porcelain?.name ?? "重建任务"} ·{" "}
+              {m.status === "success" ? "完成" : m.stage}
             </p>
             <p className="mt-1 text-xs text-ink-soft">
               {new Date(m.created * 1000).toLocaleString()}
             </p>
             {m.error && <p className="mt-2 text-sm">{m.error}</p>}
-            {m.status === 'success' && (
+            {m.status === "success" && (
               <div className="mt-4 flex flex-wrap gap-2">
                 <button
                   className="btn-ghost"
                   onClick={() => {
-                    setCurrent(asCurrent(m))
-                    setMessage('已设为当前器物，可进入讲解和对比。')
+                    setCurrent(asCurrent(m));
+                    setMessage("已设为当前器物，可进入讲解和对比。");
                   }}
                 >
                   恢复模型
@@ -337,27 +348,29 @@ export default function Learning() {
                   className="btn-ghost"
                   onClick={async () => {
                     try {
-                      await request('/models/' + m.taskId + '/save', {
-                        method: m.saved ? 'DELETE' : 'POST',
-                      })
-                      refresh()
+                      await request("/models/" + m.taskId + "/save", {
+                        method: m.saved ? "DELETE" : "POST",
+                      });
+                      refresh();
                     } catch (e) {
-                      setError((e as Error).message)
+                      setError((e as Error).message);
                     }
                   }}
                 >
-                  {m.saved ? '取消保存' : '保存模型'}
+                  {m.saved ? "取消保存" : "保存模型"}
                 </button>
-                <a
-                  href={m.modelUrl ?? ''}
-                  download={m.taskId + '.glb'}
-                  className="btn-ghost"
-                >
-                  下载GLB
-                </a>
+                {m.modelUrl && (
+                  <a
+                    href={m.modelUrl}
+                    download={m.taskId + ".glb"}
+                    className="btn-ghost"
+                  >
+                    下载GLB
+                  </a>
+                )}
               </div>
             )}
-            {m.status === 'processing' && (
+            {m.status === "processing" && (
               <Link to="/reconstruction" className="text-blue">
                 查看进度
               </Link>
@@ -381,12 +394,12 @@ export default function Learning() {
       <div className="mt-5 space-y-2">
         {summary?.attempts.map((a, i) => (
           <div key={i} className="panel p-4 text-sm">
-            <span className="text-gold">{a.correct ? '答对' : '练习'} · </span>
+            <span className="text-gold">{a.correct ? "答对" : "练习"} · </span>
             {tasks.find((t) => t.id === a.task_id)?.prompt}
             <p className="mt-2 text-ink-soft">{a.feedback}</p>
           </div>
         ))}
       </div>
     </div>
-  )
+  );
 }
