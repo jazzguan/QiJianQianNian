@@ -52,9 +52,28 @@ npm run android:apk
 conda create -n qjqn-gpu python=3.10 pip -y
 conda run -n qjqn-gpu python -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124
 conda run -n qjqn-gpu python -m pip install -r backend/requirements.txt
-conda run -n qjqn-gpu python backend/setup_triposr.py
 Copy-Item backend/.env.example backend/.env
+./scripts/fetch_weights.ps1
 ```
+
+上面最后一条会把三个引擎的源码和权重一次装齐（也可以分步：`python backend/setup_triposr.py` 只装 TripoSR 源码，权重第一次重建时自动下）。
+
+### 模型权重与 Meshroom
+
+仓库不放权重：TripoSR 约 1.6GB、Hunyuan3D-2mini 约 3.6GB、Meshroom 便携版约 2.6GB，合计十几 GB，GitHub 单文件上限 100MB，放不进仓库。三者都有公开下载源，`./scripts/fetch_weights.ps1` 会按顺序补齐，已存在的自动跳过：
+
+| 组件 | 来源 | 落到哪 | 大小 |
+| --- | --- | --- | --- |
+| TripoSR 源码 | GitHub VAST-AI-Research/TripoSR | `backend/TripoSR/` | 约 20MB |
+| TripoSR 权重 | Hugging Face `stabilityai/TripoSR` | `backend/cache/huggingface/` | 约 1.6GB |
+| Hunyuan3D-2mini 形状权重 | Hugging Face `tencent/Hunyuan3D-2mini`，只取 `hunyuan3d-dit-v2-mini` 子目录 | `backend/cache/hf_cache/` | 约 3.6GB |
+| Meshroom 2023.3.0 | GitHub alicevision/Meshroom release | `backend/cache/Meshroom-2023.3.0/` | 约 2.6GB |
+
+默认直连 Hugging Face。国内网络走镜像就加 `-Mirror "https://hf-mirror.com"`；镜像和直连哪个通，按自己网络实测选。下载中断直接重跑，curl 会续传。只装一部分用 `-SkipHunyuan` / `-SkipMeshroom` / `-SkipTripoSR`。
+
+同城或同校的话，最省事的是从已装好的机器直接拷 `backend/cache` 整个目录（约 12GB，U 盘十几分钟），比任何网盘都快。
+
+装完启动后端，`/health` 里 `triposrInstalled`、`hunyuanInstalled`、`meshroomInstalled` 三个都为 true 就齐了；缺哪个，页面上对应功能会置灰，不会影响其余部分。
 
 在 `backend/.env` 填写模型配置。密钥只由后端读取，文件已被 Git 忽略。
 
